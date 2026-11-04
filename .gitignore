@@ -34,3 +34,9 @@ settings.local.json
 *.njsproj
 *.sln
 *.sw?
+
+# quota-history plugin build output
+plugins/quota-history/*.so
+plugins/quota-history/*.dylib
+plugins/quota-history/*.dll
+plugins/quota-history/*.h
