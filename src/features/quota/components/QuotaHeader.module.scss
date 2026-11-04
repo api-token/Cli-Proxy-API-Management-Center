@@ -115,7 +115,45 @@
   }
 }
 
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: $radius-full;
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &[aria-pressed='true'] {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
+  .secondaryAction:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+
   .primaryAction:hover:not(:disabled) {
     transform: translateY(-1px);
     background: color-mix(in srgb, var(--text-primary) 86%, var(--bg-secondary));
@@ -145,11 +183,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .primaryAction {
+  .primaryAction,
+  .secondaryAction {
     transition: none;
   }
 
-  .primaryAction:active:not(:disabled) {
+  .primaryAction:active:not(:disabled),
+  .secondaryAction:active {
     transform: none;
   }
 

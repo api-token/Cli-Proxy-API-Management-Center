@@ -1,0 +1,138 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  min-width: 0;
+}
+
+.controls,
+.range,
+.field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.controls {
+  gap: 10px 16px;
+}
+
+.field {
+  flex-wrap: nowrap;
+}
+
+.select {
+  width: 150px;
+}
+
+.fieldLabel,
+.rangeLabel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.rangeLabel {
+  margin-right: 4px;
+  color: var(--text-secondary);
+}
+
+%control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-hover) var(--ease-out-strong),
+    color var(--dur-hover) var(--ease-out-strong),
+    transform var(--dur-press) var(--ease-out-strong);
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+  }
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+
+  button {
+    @extend %control;
+    height: 26px;
+    padding: 0 10px;
+
+    &[aria-pressed='true'] {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+.toggle,
+.today {
+  @extend %control;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+}
+
+.toggle[aria-expanded='true'] {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.iconButton {
+  @extend %control;
+  width: 30px;
+}
+
+.flip {
+  transform: scaleX(-1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .segmented button:hover,
+  .toggle:hover,
+  .today:hover:not(:disabled),
+  .iconButton:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented button,
+  .toggle,
+  .today,
+  .iconButton {
+    transition: none;
+
+    &:active:not(:disabled) {
+      transform: none;
+    }
+  }
+}

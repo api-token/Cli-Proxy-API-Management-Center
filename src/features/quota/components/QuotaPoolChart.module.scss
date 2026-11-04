@@ -1,0 +1,305 @@
+/* ============================================================
+ * Pooled capacity chart: one card per provider.
+ * Accent comes from the provider palette via --pool-accent.
+ * ============================================================ */
+
+.pool {
+  --pool-accent: var(--primary-color);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-primary);
+}
+
+/* ---------- header ---------- */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  min-width: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+
+  img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.accounts {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.headline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.headlineValue {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.of {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(96px, auto));
+  gap: 4px 28px;
+  margin: 0;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  dt {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  dd {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- plot ---------- */
+
+.figure {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-rows: 240px auto;
+  // Room above the plot for the "Now" label and top reset labels.
+  margin: 22px 0 0;
+  min-width: 0;
+}
+
+.yAxis {
+  position: relative;
+
+  span {
+    position: absolute;
+    right: 8px;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}
+
+.plot {
+  position: relative;
+  min-width: 0;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.gridLine {
+  stroke: var(--border-color);
+  stroke-width: 1;
+}
+
+.areaRecorded {
+  fill: color-mix(in srgb, var(--pool-accent) 22%, transparent);
+}
+
+.areaProjected {
+  fill: color-mix(in srgb, var(--pool-accent) 9%, transparent);
+}
+
+.lineRecorded,
+.lineProjected {
+  fill: none;
+  stroke: var(--pool-accent);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+
+.lineProjected {
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+}
+
+.now {
+  position: absolute;
+  top: -18px;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid var(--text-tertiary);
+  pointer-events: none;
+
+  span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translateX(-50%);
+    padding: 0 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    white-space: nowrap;
+  }
+}
+
+.resetLabel {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 6px));
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.emptyMarker {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+.emptyDot {
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--pool-accent);
+  border-radius: 50%;
+  background: var(--bg-primary);
+}
+
+.emptyLabel {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.xAxis {
+  position: relative;
+  grid-column: 2;
+  height: 26px;
+
+  span {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
+
+  // Fourteen day labels don't fit on narrow screens; keep every other one.
+  @media (max-width: 900px) {
+    span[data-odd='1'] {
+      display: none;
+    }
+  }
+}
+
+/* ---------- legend ---------- */
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.legendTitle {
+  color: var(--text-secondary);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatchRecorded,
+.swatchProjected {
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--pool-accent);
+}
+
+.swatchProjected {
+  border-top-style: dashed;
+}
