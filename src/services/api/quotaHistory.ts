@@ -1,13 +1,18 @@
 /**
- * Quota history: the backend keeps a 14-day series of per-credential readings
- * of each credential's pooled (weekly) quota window. The quota page reports
- * what it reads from provider usage endpoints, and the backend adds readings
- * it derives from proxied traffic on its own.
+ * Quota history, served by the optional `quota-history` CLIProxyAPI plugin
+ * (source in plugins/quota-history). The plugin keeps a 14-day series of
+ * per-credential readings of each credential's pooled (weekly) window: the
+ * quota page reports what it reads from provider usage endpoints, and the
+ * plugin records Claude/Codex readings from proxied traffic on its own.
+ *
+ * Plugin routes can only live under /v0/management, so this is the one
+ * management path outside the v8 prefix. A 404 means the plugin is not
+ * installed.
  */
 
 import { apiClient } from './client';
 
-const HISTORY_PATH = '/credentials/quota/history';
+const HISTORY_PATH = '/v0/management/quota-history';
 /** Mirrors the backend's per-request limit. */
 export const QUOTA_HISTORY_MAX_BATCH = 500;
 
@@ -76,7 +81,7 @@ const serializeSample = (sample: QuotaHistorySampleInput) => ({
 export const quotaHistoryApi = {
   async list(sinceMs?: number): Promise<QuotaHistorySample[]> {
     const params = sinceMs !== undefined ? { since: new Date(sinceMs).toISOString() } : undefined;
-    const data = await apiClient.get<unknown>(HISTORY_PATH, { params });
+    const data = await apiClient.get<unknown>(apiClient.pluginRouteUrl(HISTORY_PATH), { params });
     const samples = isRecord(data) && Array.isArray(data.samples) ? data.samples : [];
     return samples
       .map(normalizeQuotaHistorySample)
@@ -86,7 +91,7 @@ export const quotaHistoryApi = {
   async record(samples: QuotaHistorySampleInput[]): Promise<void> {
     for (let index = 0; index < samples.length; index += QUOTA_HISTORY_MAX_BATCH) {
       const batch = samples.slice(index, index + QUOTA_HISTORY_MAX_BATCH).map(serializeSample);
-      await apiClient.post(HISTORY_PATH, { samples: batch });
+      await apiClient.post(apiClient.pluginRouteUrl(HISTORY_PATH), { samples: batch });
     }
   },
 };

@@ -12,6 +12,7 @@ import {
   type PoolMember,
 } from '@/features/quota/poolModel';
 import { normalizeQuotaHistorySample } from '@/services/api/quotaHistory';
+import { buildPoolMembers, groupSamples } from '@/features/quota/poolMembers';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 4, 12);
@@ -258,5 +259,51 @@ describe('projectPool redistribution', () => {
     // The pool keeps draining at the full 10%/h even after A runs dry.
     projection.drain.forEach((point) => expect(point.v).toBeCloseTo(10, 5));
     expect(projection.points[projection.points.length - 1].v).toBeCloseTo(90.5 - 20, 5);
+  });
+});
+
+describe('buildPoolMembers history matching', () => {
+  const sampleFor = (name: string, authIndex: string | null, provider = 'claude') => ({
+    name,
+    authIndex,
+    provider,
+    observedAtMs: NOW - HOUR,
+    windowId: null,
+    periodHours: 168,
+    remainingPercent: 50,
+    resetAtMs: null,
+    source: 'observed',
+  });
+  const entry = (name: string, type: 'claude' | 'devin', authIndex?: string) => ({
+    file: { name, type, authIndex },
+    type,
+  });
+
+  test('matches plugin readings by auth_index even when the name differs', () => {
+    const samples = groupSamples([
+      sampleFor('claude:oauth:internal-id', 'idx-1'),
+      sampleFor('claude-a.json', null),
+    ]);
+    const members = buildPoolMembers(
+      [entry('claude-a.json', 'claude', 'idx-1')],
+      'claude',
+      samples,
+      new Map(),
+      (item) => item.file.name
+    );
+    expect(members).toHaveLength(1);
+    expect(members[0].samples).toHaveLength(2);
+  });
+
+  test('never falls back to the shared file name for multi-identity providers', () => {
+    const samples = groupSamples([sampleFor('devin.json', null, 'devin')]);
+    const members = buildPoolMembers(
+      [entry('devin.json', 'devin', 'idx-2')],
+      'devin',
+      samples,
+      new Map(),
+      (item) => item.file.name
+    );
+    expect(members).toHaveLength(0);
   });
 });

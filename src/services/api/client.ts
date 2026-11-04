@@ -10,6 +10,7 @@ import {
   CPA_BUILD_DATE_HEADER_KEYS,
   CPA_SUPPORT_PLUGIN_HEADER_KEYS,
   CPA_VERSION_HEADER_KEYS,
+  MANAGEMENT_API_PREFIX,
   REQUEST_TIMEOUT_MS,
   VERSION_HEADER_KEYS,
 } from '@/utils/constants';
@@ -49,6 +50,16 @@ class ApiClient {
     } else {
       this.instance.defaults.timeout = REQUEST_TIMEOUT_MS;
     }
+  }
+
+  /**
+   * Absolute URL for a plugin-declared route outside the v8 prefix, such as
+   * `/v0/management/quota-history`. Requests to it still go through this
+   * client, so auth, error normalization and session guards apply.
+   */
+  pluginRouteUrl(path: string): string {
+    if (!this.apiBase.endsWith(MANAGEMENT_API_PREFIX)) return path;
+    return `${this.apiBase.slice(0, -MANAGEMENT_API_PREFIX.length)}${path}`;
   }
 
   /** Guards read/modify/write operations across connection changes, including ABA switches. */

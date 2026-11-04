@@ -15,14 +15,27 @@ import { buildTimelineLane } from './quotaTimelineModel';
 /** Providers whose credentials share a file name and differ by auth_index. */
 const INDEXED_PROVIDERS = new Set<string>(['devin', 'plugin']);
 
+/**
+ * Series key for a sample. auth_index is preferred: readings the plugin
+ * records from proxied traffic name a credential by the host's auth ID, which
+ * need not match the file name the dashboard shows, but both carry the same
+ * auth_index. Samples without one fall back to the name.
+ */
 export function historySeriesKey(
   provider: string,
   name: string,
   authIndex: string | null | undefined
 ): string {
-  return INDEXED_PROVIDERS.has(provider)
-    ? `${provider}\0${name}\0${authIndex ?? ''}`
-    : `${provider}\0${name}`;
+  return authIndex ? `${provider}\0idx\0${authIndex}` : `${provider}\0name\0${name}`;
+}
+
+/** Every series key that may hold history for a credential. */
+function seriesKeysFor(provider: string, name: string, authIndex: string | null): string[] {
+  const keys: string[] = [];
+  if (authIndex) keys.push(historySeriesKey(provider, name, authIndex));
+  // A file name is ambiguous for providers with several identities per file.
+  if (!INDEXED_PROVIDERS.has(provider)) keys.push(historySeriesKey(provider, name, null));
+  return keys;
 }
 
 /** A loaded credential's current reading of its pooled window. */
@@ -79,14 +92,13 @@ export function buildPoolMembers(
     if (entry.type !== provider) return;
     const key = getQuotaCacheKey(entry.file);
     const live = liveByKey.get(key) ?? null;
-    const series =
-      samplesBySeries.get(
-        historySeriesKey(
-          provider,
-          entry.file.name,
-          normalizeRecentRequestAuthIndex(entry.file.authIndex)
-        )
-      ) ?? [];
+    const series = seriesKeysFor(
+      provider,
+      entry.file.name,
+      normalizeRecentRequestAuthIndex(entry.file.authIndex)
+    )
+      .flatMap((seriesKey) => samplesBySeries.get(seriesKey) ?? [])
+      .sort((a, b) => a.observedAtMs - b.observedAtMs);
     const periodHours =
       live?.periodHours ?? [...series].reverse().find((s) => s.periodHours)?.periodHours ?? null;
     const samples = series.filter((s) => samePeriod(s.periodHours, periodHours));

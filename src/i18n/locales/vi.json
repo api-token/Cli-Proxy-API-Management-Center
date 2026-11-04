@@ -1582,7 +1582,7 @@
     "pool_legend_projected": "Dự báo",
     "pool_aria": "Quota chung {{provider}}: còn {{remaining}} trên {{capacity}}, tiêu hao {{burn}}; hết quota: {{empty}}",
     "pool_none": "Chưa có số liệu quota. Quota chung sẽ hiện khi thông tin xác thực báo cáo cửa sổ quota.",
-    "pool_history_unsupported": "Backend này không lưu lịch sử quota, nên biểu đồ chỉ hiện số liệu của lần truy cập này. Hãy cập nhật CLI Proxy API để lưu lịch sử.",
+    "pool_history_unsupported": "Lịch sử quota không được ghi lại, nên biểu đồ chỉ hiện số liệu của lần truy cập này. Hãy cài plugin quota-history trong CLI Proxy API để lưu lịch sử.",
     "pool_duration_dh": "{{d}} ngày {{h}} giờ",
     "pool_duration_hm": "{{h}} giờ {{m}} phút",
     "pool_duration_m": "{{m}} phút",

@@ -1629,7 +1629,7 @@
     "pool_legend_projected": "预测",
     "pool_aria": "{{provider}} 额度池：剩余 {{remaining}} / {{capacity}}，消耗 {{burn}}；耗尽时间：{{empty}}",
     "pool_none": "暂无额度读数。凭证上报额度窗口后会显示额度池。",
-    "pool_history_unsupported": "当前后端不记录额度历史，图表仅显示本次访问的读数。升级 CLI Proxy API 以保留历史。",
+    "pool_history_unsupported": "未记录额度历史，图表仅显示本次访问的读数。在 CLI Proxy API 中安装 quota-history 插件以保留历史。",
     "pool_duration_dh": "{{d}}天{{h}}小时",
     "pool_duration_hm": "{{h}}小时{{m}}分",
     "pool_duration_m": "{{m}}分钟",

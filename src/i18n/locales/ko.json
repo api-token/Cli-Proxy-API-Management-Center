@@ -1631,7 +1631,7 @@
     "pool_legend_projected": "예측",
     "pool_aria": "{{provider}} 풀: {{capacity}} 중 {{remaining}} 남음, 소진 {{burn}}; 풀 소진: {{empty}}",
     "pool_none": "아직 할당량 데이터가 없습니다. 자격 증명이 할당량 창을 보고하면 풀이 표시됩니다.",
-    "pool_history_unsupported": "이 백엔드는 할당량 기록을 저장하지 않아 이번 방문의 데이터만 차트에 표시됩니다. 기록을 유지하려면 CLI Proxy API를 업데이트하세요.",
+    "pool_history_unsupported": "할당량 기록이 저장되지 않아 이번 방문의 데이터만 차트에 표시됩니다. 기록을 유지하려면 CLI Proxy API에 quota-history 플러그인을 설치하세요.",
     "pool_duration_dh": "{{d}}일 {{h}}시간",
     "pool_duration_hm": "{{h}}시간 {{m}}분",
     "pool_duration_m": "{{m}}분",

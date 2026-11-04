@@ -1631,7 +1631,7 @@
     "pool_legend_projected": "Projected",
     "pool_aria": "{{provider}} pool: {{remaining}} of {{capacity}} remaining, burning {{burn}}; pool empty: {{empty}}",
     "pool_none": "No quota readings yet. Pools appear once credentials report a quota window.",
-    "pool_history_unsupported": "This backend doesn't record quota history, so the charts only show readings from this visit. Update CLI Proxy API to keep history.",
+    "pool_history_unsupported": "Quota history isn't being recorded, so the charts only show readings from this visit. Install the quota-history plugin in CLI Proxy API to keep history.",
     "pool_duration_dh": "{{d}}d {{h}}h",
     "pool_duration_hm": "{{h}}h {{m}}m",
     "pool_duration_m": "{{m}}m",

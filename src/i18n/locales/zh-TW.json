@@ -1657,7 +1657,7 @@
     "pool_legend_projected": "預測",
     "pool_aria": "{{provider}} 額度池：剩餘 {{remaining}} / {{capacity}}，消耗 {{burn}}；耗盡時間：{{empty}}",
     "pool_none": "尚無額度讀數。憑證回報額度視窗後會顯示額度池。",
-    "pool_history_unsupported": "目前後端不記錄額度歷史，圖表僅顯示本次造訪的讀數。升級 CLI Proxy API 以保留歷史。",
+    "pool_history_unsupported": "未記錄額度歷史，圖表僅顯示本次造訪的讀數。在 CLI Proxy API 中安裝 quota-history 外掛以保留歷史。",
     "pool_duration_dh": "{{d}}天{{h}}小時",
     "pool_duration_hm": "{{h}}小時{{m}}分",
     "pool_duration_m": "{{m}}分鐘",
