@@ -1,0 +1,7 @@
+{"systemInstruction":{"parts":[{"text":"You are a test model."}]},
+ "tools":[{"functionDeclarations":[{"name":"search_docs"}]}],
+ "contents":[
+  {"role":"user","parts":[{"text":"Find the docs."},{"inlineData":{"mimeType":"image/png","data":"iVBORw0KGgo="}}]},
+  {"role":"model","parts":[{"functionCall":{"name":"search_docs","args":{"q":"docs"}}}]},
+  {"role":"user","parts":[{"functionResponse":{"name":"search_docs","response":{"result":"found 2"}}}]}
+ ]}

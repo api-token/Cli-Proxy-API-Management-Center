@@ -1,0 +1,9 @@
+{"model":"test-claude","stream":true,"max_tokens":1000,
+ "metadata":{"user_id":"{\"device_id\":\"dev-0001\",\"account_uuid\":\"acct-0001\",\"session_id\":\"cc-sess-0001\"}"},
+ "system":[{"type":"text","text":"You are Claude Code."},{"type":"text","text":"Be brief."}],
+ "tools":[{"name":"Bash","input_schema":{}},{"name":"Read","input_schema":{}}],
+ "messages":[
+  {"role":"user","content":"Run the tests."},
+  {"role":"assistant","content":[{"type":"thinking","thinking":"Run go test.","signature":"c2lnbmF0dXJl"},{"type":"text","text":"Running."},{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"go test ./..."}}]},
+  {"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","is_error":true,"content":[{"type":"text","text":"FAIL pkg/x"}]},{"type":"text","text":"Fix it."}]}
+ ]}

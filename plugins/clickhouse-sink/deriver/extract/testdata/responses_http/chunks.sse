@@ -1,0 +1,35 @@
+event: response.created
+%%
+data: {"type":"response.created","response":{"id":"resp_test_http","status":"in_progress","output":[]}}
+%%
+event: response.output_item.added
+%%
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_1","type":"reasoning","summary":[],"encrypted_content":"Z0FBQUFBQm9fZW5jcnlwdGVk"}}
+%%
+data: {"type":"response.reasoning_summary_part.added","output_index":0,"summary_index":0,"part":{"type":"summary_text","text":""}}
+%%
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"Need to "}
+%%
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"list files."}
+%%
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"rs_1","type":"reasoning","summary":[{"type":"summary_text","text":"Need to list files."}],"encrypted_content":"Z0FBQUFBQm9fZW5jcnlwdGVk"}}
+%%
+data: {"type":"response.output_item.added","output_index":1,"item":{"id":"msg_1","type":"message","role":"assistant","status":"in_progress","content":[],"phase":"commentary"}}
+%%
+data: {"type":"response.output_text.delta","output_index":1,"content_index":0,"delta":"Listing "}
+%%
+data: {"type":"response.output_text.delta","output_index":1,"content_index":0,"delta":"now."}
+%%
+data: {"type":"response.output_item.done","output_index":1,"item":{"id":"msg_1","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"Listing now."}],"phase":"commentary"}}
+%%
+data: {"type":"response.output_item.added","output_index":2,"item":{"id":"ctc_1","type":"custom_tool_call","status":"in_progress","call_id":"call_x1","name":"exec","input":""}}
+%%
+data: {"type":"response.custom_tool_call_input.delta","output_index":2,"delta":"ls "}
+%%
+data: {"type":"response.custom_tool_call_input.delta","output_index":2,"delta":"-la"}
+%%
+data: {"type":"response.output_item.done","output_index":2,"item":{"id":"ctc_1","type":"custom_tool_call","status":"completed","call_id":"call_x1","name":"exec","input":"ls -la"}}
+%%
+event: response.completed
+%%
+data: {"type":"response.completed","response":{"id":"resp_test_http","status":"completed","output":[],"incomplete_details":null}}

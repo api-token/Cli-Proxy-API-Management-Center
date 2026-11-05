@@ -1,0 +1,1 @@
+{"id":"resp_test_mem","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"{\"rollout_summary\":\"synthetic\"}"}]}]}

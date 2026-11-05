@@ -1,0 +1,3 @@
+{"type":"response.create","model":"test-codex","previous_response_id":"resp_test_ws_1",
+ "input":[{"type":"custom_tool_call_output","call_id":"call_w1","output":[{"type":"input_text","text":"Script completed\nOutput:\nREADME.md"}]}],
+ "client_metadata":{"session_id":"sess-0002","x-codex-turn-metadata":"{\"session_id\":\"sess-0002\",\"turn_id\":\"turn-0002\",\"request_kind\":\"turn\"}"}}

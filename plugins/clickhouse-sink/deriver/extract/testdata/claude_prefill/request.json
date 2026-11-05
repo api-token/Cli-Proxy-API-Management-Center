@@ -1,0 +1,8 @@
+{"model":"test-claude","max_tokens":100,"system":"Answer in JSON.",
+ "messages":[
+  {"role":"user","content":"Look up the user."},
+  {"role":"assistant","content":[{"type":"tool_use","id":"toolu_p1","name":"lookup","input":{"id":7}}]},
+  {"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_p1","content":"name=Ada"}]},
+  {"role":"user","content":"Return it as JSON."},
+  {"role":"assistant","content":"{\"name\":"}
+ ]}

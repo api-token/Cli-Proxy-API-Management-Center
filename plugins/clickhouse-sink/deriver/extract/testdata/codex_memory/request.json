@@ -1,0 +1,2 @@
+{"model":"test-codex-mini","instructions":"Summarize the rollout into memory.","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Rollout transcript: (synthetic)"}]}],
+ "tools":[{"type":"web_search"}]}
