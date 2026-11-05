@@ -56,7 +56,9 @@ LIMIT 50
 ;
 -- 5. Failing tools: tool results flagged as errors, joined to the call that
 --    produced them. Codex tool outputs carry no error flag, so for Codex this
---    falls back to the result text mentioning an error.
+--    uses its "Script failed" / "Script completed" prefix, and other outputs
+--    fall back to a text heuristic (output starting with an error, a non-zero
+--    exit code, a traceback). Check the example before trusting a count.
 SELECT c.tool_name, count() AS failures, any(substring(res.text, 1, 300)) AS example
 FROM cliproxy.messages AS res
 INNER JOIN
@@ -66,7 +68,10 @@ INNER JOIN
     WHERE role = 'assistant' AND tool_name != '' AND call_id != '' AND started_at > now() - INTERVAL 30 DAY
 ) AS c ON c.conversation_id = res.conversation_id AND c.call_id = res.call_id
 WHERE res.role = 'tool' AND res.started_at > now() - INTERVAL 30 DAY
-  AND (res.is_error OR match(res.text, '(?i)\\b(error|failed|exception|traceback|exit code [1-9])\\b'))
+  AND (res.is_error
+       OR startsWith(res.text, 'Script failed')
+       OR (NOT startsWith(res.text, 'Script completed')
+           AND match(res.text, '(?i)^\\s*(error|failed|fatal)\\b|exit (code|status):? *[1-9]|traceback \\(most recent call last\\)')))
 GROUP BY c.tool_name
 ORDER BY failures DESC
 LIMIT 30
@@ -91,14 +96,18 @@ ORDER BY requests DESC
 LIMIT 50
 ;
 -- 8. Tokens per day, client and model (memory and other background calls
---    are separated by request_kind).
-SELECT toDate(started_at) AS day, client, model, request_kind, count() AS requests,
+--    are separated by request_kind). Timestamps are UTC; EDIT the time zone
+--    so "day" matches yours. input/cache columns follow each provider's own
+--    accounting (Codex input includes cache reads, Claude's excludes them);
+--    total is comparable across providers.
+SELECT toDate(toTimeZone(started_at, 'America/Chicago')) AS day, client, model, request_kind, count() AS requests,
        sum(input_tokens) AS input, sum(cache_read_tokens) AS cache_read,
-       sum(output_tokens) AS output, sum(reasoning_tokens) AS reasoning
+       sum(output_tokens) AS output, sum(reasoning_tokens) AS reasoning, sum(total_tokens) AS total
 FROM cliproxy.request_summary
 WHERE started_at > now() - INTERVAL 30 DAY
 GROUP BY day, client, model, request_kind
 ORDER BY day DESC, input DESC
+LIMIT 200
 ;
 -- 9. Slowest requests in the last 7 days.
 SELECT started_at, duration_ms, client, model, final_provider, attempts, output_tokens,
@@ -132,9 +141,12 @@ FROM cliproxy.requests
 WHERE started_at > now() - INTERVAL 30 DAY
 GROUP BY rule
 ORDER BY requests DESC
+LIMIT 50
 ;
 -- 12. Extraction health: rows the deriver could not fully parse.
 SELECT parse_status, source_format, count() AS requests, any(parse_error) AS example_error
 FROM cliproxy.request_facts
+WHERE started_at > now() - INTERVAL 30 DAY
 GROUP BY parse_status, source_format
 ORDER BY requests DESC
+LIMIT 50
