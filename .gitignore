@@ -40,3 +40,7 @@ plugins/quota-history/*.so
 plugins/quota-history/*.dylib
 plugins/quota-history/*.dll
 plugins/quota-history/*.h
+plugins/clickhouse-sink/*.so
+plugins/clickhouse-sink/*.dylib
+plugins/clickhouse-sink/*.dll
+plugins/clickhouse-sink/*.h
