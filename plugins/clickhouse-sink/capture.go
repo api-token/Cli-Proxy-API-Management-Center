@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -22,6 +21,7 @@ type interceptRequest struct {
 	Stream         bool
 	Headers        http.Header
 	Body           []byte
+	Metadata       map[string]any
 }
 
 type responseRequest struct {
@@ -50,6 +50,7 @@ type completion struct {
 	Error          string
 	StartedAt      time.Time
 	CompletedAt    time.Time
+	Metadata       map[string]any
 }
 
 type usageRecord struct {
@@ -105,6 +106,7 @@ type requestRow struct {
 	SourceFormat    string            `json:"source_format"`
 	Model           string            `json:"model"`
 	RequestedModel  string            `json:"requested_model"`
+	Path            string            `json:"path"`
 	Stream          bool              `json:"stream"`
 	Outcome         string            `json:"outcome"`
 	StatusCode      int               `json:"status_code"`
@@ -113,7 +115,9 @@ type requestRow struct {
 	RequestBody     string            `json:"request_body"`
 	ResponseHeaders map[string]string `json:"response_headers"`
 	ResponseBody    string            `json:"response_body"`
-	ResponseChunks  int               `json:"response_chunks"`
+	ResponseChunks  []string          `json:"response_chunks"`
+	RedactionCount  int               `json:"redaction_count"`
+	RedactionRules  []string          `json:"redaction_rules"`
 }
 
 type usageRow struct {
@@ -165,9 +169,10 @@ type pending struct {
 	updatedAt       time.Time
 	requestHeaders  http.Header
 	requestBody     []byte
+	path            string
 	responseHeaders http.Header
-	responseBody    bytes.Buffer
-	chunks          int
+	responseBody    []byte
+	chunks          []string
 }
 
 // capture collects the request and response bodies of in-flight requests,
@@ -202,7 +207,7 @@ func (c *capture) begin(req interceptRequest, now time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sweepLocked(now)
-	entry := &pending{startedAt: now, updatedAt: now}
+	entry := &pending{startedAt: now, updatedAt: now, path: metadataString(req.Metadata, "request_path")}
 	if c.bodies {
 		entry.requestHeaders = req.Headers
 		entry.requestBody = req.Body
@@ -219,8 +224,7 @@ func (c *capture) response(req responseRequest, now time.Time) {
 	}
 	entry.updatedAt = now
 	entry.responseHeaders = req.ResponseHeaders
-	entry.responseBody.Reset()
-	entry.responseBody.Write(req.Body)
+	entry.responseBody = req.Body
 }
 
 func (c *capture) chunk(req streamChunkRequest, now time.Time) {
@@ -237,11 +241,9 @@ func (c *capture) chunk(req streamChunkRequest, now time.Time) {
 	if req.ChunkIndex < 0 || len(req.Body) == 0 {
 		return
 	}
-	entry.chunks++
-	entry.responseBody.Write(req.Body)
-	if req.Body[len(req.Body)-1] != '\n' {
-		entry.responseBody.WriteByte('\n')
-	}
+	// Chunks are kept exactly as delivered: some formats send unframed SSE
+	// lines and the client handler adds the framing.
+	entry.chunks = append(entry.chunks, string(req.Body))
 }
 
 // complete removes the capture for a finished request and returns its row.
@@ -260,6 +262,7 @@ func (c *capture) complete(ev completion) requestRow {
 		SourceFormat:   ev.SourceFormat,
 		Model:          ev.Model,
 		RequestedModel: ev.RequestedModel,
+		Path:           metadataString(ev.Metadata, "request_path"),
 		Stream:         ev.Stream,
 		Outcome:        ev.Outcome,
 		StatusCode:     ev.StatusCode,
@@ -269,8 +272,11 @@ func (c *capture) complete(ev completion) requestRow {
 		row.RequestHeaders = flattenHeaders(entry.requestHeaders)
 		row.RequestBody = string(entry.requestBody)
 		row.ResponseHeaders = flattenHeaders(entry.responseHeaders)
-		row.ResponseBody = entry.responseBody.String()
+		row.ResponseBody = string(entry.responseBody)
 		row.ResponseChunks = entry.chunks
+		if row.Path == "" {
+			row.Path = entry.path
+		}
 	}
 	return row
 }
@@ -381,5 +387,14 @@ func formatTime(t time.Time) string {
 	if t.IsZero() {
 		t = time.Now()
 	}
-	return t.UTC().Format("2006-01-02 15:04:05.000")
+	// Nine digits: usage attribution compares attempt and request start
+	// times, which can fall in the same millisecond (DESIGN.md A1).
+	return t.UTC().Format("2006-01-02 15:04:05.000000000")
+}
+
+func metadataString(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
 }

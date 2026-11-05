@@ -31,7 +31,14 @@ type pluginConfig struct {
 	Username    string `yaml:"username"`
 	Password    string `yaml:"password"`
 	StoreBodies *bool  `yaml:"store-bodies"`
+	// RedactFiles lists files or directories whose secrets are redacted.
+	RedactFiles []string `yaml:"redact-files"`
+	// RedactDisabledRules turns off gitleaks rule IDs that misfire.
+	RedactDisabledRules []string `yaml:"redact-disabled-rules"`
 }
+
+// defaultRedactFiles is CPA's config in its working directory.
+var defaultRedactFiles = []string{"config.yaml"}
 
 func parseConfig(raw []byte) (sinkConfig, error) {
 	var cfg pluginConfig
@@ -41,11 +48,16 @@ func parseConfig(raw []byte) (sinkConfig, error) {
 		}
 	}
 	out := sinkConfig{
-		URL:         strings.TrimRight(strings.TrimSpace(cfg.URL), "/"),
-		Database:    strings.TrimSpace(cfg.Database),
-		Username:    strings.TrimSpace(cfg.Username),
-		Password:    cfg.Password,
-		StoreBodies: cfg.StoreBodies == nil || *cfg.StoreBodies,
+		URL:           strings.TrimRight(strings.TrimSpace(cfg.URL), "/"),
+		Database:      strings.TrimSpace(cfg.Database),
+		Username:      strings.TrimSpace(cfg.Username),
+		Password:      cfg.Password,
+		StoreBodies:   cfg.StoreBodies == nil || *cfg.StoreBodies,
+		SecretFiles:   cfg.RedactFiles,
+		DisabledRules: cfg.RedactDisabledRules,
+	}
+	if out.SecretFiles == nil {
+		out.SecretFiles = defaultRedactFiles
 	}
 	if out.URL == "" {
 		out.URL = defaultURL
@@ -86,7 +98,9 @@ const registration = `{
       {"Name": "database", "Type": "string", "Default": %q, "Description": "Database for the requests and usage tables. Created on startup."},
       {"Name": "username", "Type": "string", "Default": %q, "Description": "ClickHouse user."},
       {"Name": "password", "Type": "string", "Default": "", "Description": "ClickHouse password. Falls back to the CLICKHOUSE_PASSWORD environment variable."},
-      {"Name": "store-bodies", "Type": "boolean", "Default": true, "Description": "Store request and response bodies and headers. When false only metadata is stored."}
+      {"Name": "store-bodies", "Type": "boolean", "Default": true, "Description": "Store request and response bodies and headers. When false only metadata is stored."},
+      {"Name": "redact-files", "Type": "array", "Default": ["config.yaml"], "Description": "Files or directories whose secrets are replaced before storage: .json/.yaml by credential-like key, .env by value, other files one secret per line."},
+      {"Name": "redact-disabled-rules", "Type": "array", "Default": [], "Description": "gitleaks rule IDs to skip when they misfire."}
     ]
   },
   "capabilities": {
@@ -109,9 +123,16 @@ type plugin struct {
 	mu      sync.Mutex
 	sink    *sink
 	capture *capture
+	redact  *redactor
 }
 
 var current = &plugin{capture: newCapture()}
+
+func (p *plugin) currentRedactor() *redactor {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.redact
+}
 
 func (p *plugin) currentSink() *sink {
 	p.mu.Lock()
@@ -132,6 +153,10 @@ func (p *plugin) configure(raw []byte) error {
 		p.sink.reconfigure(cfg)
 	}
 	p.sink.start()
+	if p.redact == nil {
+		p.redact = newRedactor()
+	}
+	p.redact.configure(cfg.SecretFiles, cfg.DisabledRules)
 	p.capture.setStoreBodies(cfg.StoreBodies)
 	return nil
 }
@@ -205,6 +230,8 @@ func (p *plugin) handle(method string, request []byte) (json.RawMessage, error) 
 		row := p.capture.complete(req)
 		// Model listings and similar calls also complete; they are not inference.
 		if s := p.currentSink(); s != nil && (row.Model != "" || row.RequestedModel != "") {
+			// Redact before the row reaches any buffer, so no layer holds a secret.
+			p.currentRedactor().redactRequest(&row)
 			s.add(tableRequests, row)
 		}
 		return emptyResult, nil
@@ -215,7 +242,9 @@ func (p *plugin) handle(method string, request []byte) (json.RawMessage, error) 
 			return nil, fmt.Errorf("decode usage record: %w", errDecode)
 		}
 		if s := p.currentSink(); s != nil {
-			s.add(tableUsage, usageRowFrom(record, p.capture.storeBodies()))
+			row := usageRowFrom(record, p.capture.storeBodies())
+			p.currentRedactor().redactUsage(&row)
+			s.add(tableUsage, row)
 		}
 		return emptyResult, nil
 	}
