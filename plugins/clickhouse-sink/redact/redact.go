@@ -29,6 +29,10 @@ import (
 const (
 	// minSecretLen skips short values such as ports and booleans.
 	minSecretLen = 12
+	// minTruncatedLen is the shortest start of a known secret that is redacted
+	// on its own, so a copy cut off mid-secret (a reply stopped by max_tokens)
+	// is still caught.
+	minTruncatedLen = 16
 	// reloadInterval bounds how often secret files are checked for changes.
 	// CPA rotates OAuth access tokens, so the known set must follow them.
 	reloadInterval = 30 * time.Second
@@ -132,12 +136,21 @@ func (rp *Replacer) Apply(s string, res *Result) string {
 func (r *Redactor) NewReplacer(texts []string) *Replacer {
 	r.reloadIfStale(time.Now())
 	r.mu.Lock()
-	pairs := make(map[string]string, len(r.known))
-	for secret, replacement := range r.known {
+	known, disabled := r.known, r.disabled // replaced on reload, never mutated
+	r.mu.Unlock()
+	pairs := make(map[string]string, len(known))
+	for secret, replacement := range known {
 		pairs[secret] = replacement
 	}
-	disabled := r.disabled
-	r.mu.Unlock()
+	for secret, replacement := range known {
+		for _, text := range texts {
+			for _, cut := range truncatedCopies(text, secret) {
+				if _, exists := pairs[cut]; !exists {
+					pairs[cut] = replacement
+				}
+			}
+		}
+	}
 
 	if r.detector != nil {
 		joined := strings.Join(texts, "\n")
@@ -165,6 +178,32 @@ func (r *Redactor) NewReplacer(texts []string) *Replacer {
 		args = append(args, secret, pairs[secret])
 	}
 	return &Replacer{rep: strings.NewReplacer(args...), pairs: pairs}
+}
+
+// truncatedCopies returns the cut-off copies of secret in text: each place
+// where at least its first minTruncatedLen characters appear but not the
+// whole secret, extended for as long as the text keeps matching it.
+func truncatedCopies(text, secret string) []string {
+	if len(secret) <= minTruncatedLen {
+		return nil
+	}
+	prefix := secret[:minTruncatedLen]
+	var out []string
+	for off := 0; ; {
+		i := strings.Index(text[off:], prefix)
+		if i < 0 {
+			return out
+		}
+		start := off + i
+		n := minTruncatedLen
+		for n < len(secret) && start+n < len(text) && text[start+n] == secret[n] {
+			n++
+		}
+		if n < len(secret) {
+			out = append(out, secret[:n])
+		}
+		off = start + n
+	}
 }
 
 // apply replaces secrets in s and records each replacement.
