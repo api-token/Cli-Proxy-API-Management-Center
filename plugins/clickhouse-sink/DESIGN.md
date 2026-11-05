@@ -130,3 +130,21 @@ Note: full bodies can contain secrets pasted into prompts or tool output; access
 - Full per-request `message_occurrences` (duplicates entire history again): tail emission instead.
 - The A1 fork patch (deferred behind the mis-join detector, see A1); late identity revisiting (identity uses only the raw request).
 - ReplacingMergeTree + fingerprint dedupe, SimHash clustering, bloom/text indexes, custom UI.
+
+## Implementation notes (where the build differs from the plan)
+- Responses reassembly: real Codex streams send `response.completed` with an empty `output`, so the deriver uses the
+  final output when present, else `response.output_item.done` items, else added items plus deltas.
+- Codex identity (session, thread, turn metadata) is read from the body's `client_metadata` before headers: on a
+  websocket the headers belong to the upgrade request and are stale for later turns.
+- A failed `request_facts` insert stops the pass rather than continuing, so the watermark cannot move past failed rows.
+- Split secrets (found live): a model repeating a secret a few characters per delta left the pieces in raw chunks and
+  the deriver reassembled them into searchable `reply_text`. The plugin now joins each stream's text pieces, finds
+  secrets spanning chunks and replaces every carrying chunk with the marker; the deriver redacts all derived text again
+  with the same sources (shared `redact` package) and keeps those markers in `reply_text`. A truncated secret (model cut
+  off by `max_tokens`) is still not caught by exact matching.
+- The first known-secret load is synchronous and a reload holds a lock until done (a race let one row through live).
+- `prompt_cache_key` is exempt from gitleaks' generic rule: it is Codex's conversation ID.
+- Message `type` stays protocol-native; queries identify tool calls by `role = 'assistant' AND tool_name != ''` and
+  tool results by `role = 'tool'`. Codex tool outputs have no error flag, so "failing tools" also matches error text.
+- ClickHouse logs at `warning` with `text_log` off, so query text (which can quote stored inference) is not written to
+  server log files. `inference_reader` cannot read `system.*` tables.
