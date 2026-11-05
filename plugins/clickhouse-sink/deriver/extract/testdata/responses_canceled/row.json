@@ -1,0 +1,2 @@
+{"request_id":"req-codex-cancel","source_format":"openai-response","path":"/v1/responses","model":"test-codex","stream":true,"outcome":"canceled","status_code":0,"error":"context canceled",
+ "request_headers":{"originator":"codex_cli_rs","session-id":"sess-0003"}}

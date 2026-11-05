@@ -1,0 +1,7 @@
+{"model":"test-codex","stream":true,"store":false,
+ "input":[
+  {"type":"message","role":"developer","content":[{"type":"input_text","text":"You are a coding agent."}]},
+  {"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":"functions","tools":[{"type":"custom","name":"exec"},{"type":"function","name":"wait"}]}]},
+  {"type":"message","role":"user","content":[{"type":"input_text","text":"List the files."}]}
+ ],
+ "client_metadata":{"session_id":"sess-0001","thread_id":"sess-0001","turn_id":"turn-0001"}}

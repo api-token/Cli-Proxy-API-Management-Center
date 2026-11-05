@@ -1,0 +1,2 @@
+{"request_id":"req-gemini-1","source_format":"gemini","path":"/v1beta/models/test-gemini:streamGenerateContent?alt=sse","model":"test-gemini","stream":true,"outcome":"succeeded","status_code":200,
+ "request_headers":{"user-agent":"GeminiCLI/0.9.0 (linux; x64)"}}

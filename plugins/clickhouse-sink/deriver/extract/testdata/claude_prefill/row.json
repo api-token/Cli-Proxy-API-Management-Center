@@ -1,0 +1,2 @@
+{"request_id":"req-claude-prefill","source_format":"claude","path":"/v1/messages","model":"test-claude","stream":false,"outcome":"succeeded","status_code":200,
+ "request_headers":{"user-agent":"anthropic-sdk/1.0","x-claude-code-session-id":"cc-sess-0002"}}

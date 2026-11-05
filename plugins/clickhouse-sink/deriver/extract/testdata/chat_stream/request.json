@@ -1,0 +1,6 @@
+{"model":"test-model","stream":true,
+ "tools":[{"type":"function","function":{"name":"get_weather","parameters":{}}},{"type":"function","function":{"name":"get_time","parameters":{}}}],
+ "messages":[
+  {"role":"system","content":"You are a test assistant."},
+  {"role":"user","content":[{"type":"text","text":"Weather and time in Paris?"},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="}}]}
+ ]}

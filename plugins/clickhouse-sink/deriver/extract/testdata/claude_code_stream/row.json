@@ -1,0 +1,2 @@
+{"request_id":"req-claude-1","source_format":"claude","path":"/v1/messages","model":"test-claude","stream":true,"outcome":"succeeded","status_code":200,
+ "request_headers":{"user-agent":"claude-cli/9.9.9 (external, cli)","anthropic-version":"2023-06-01"}}

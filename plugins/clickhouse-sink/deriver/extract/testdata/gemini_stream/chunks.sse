@@ -1,0 +1,5 @@
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Thinking about it","thought":true}]}}],"responseId":"gem-resp-1"}
+%%
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"There are "}]}}],"responseId":"gem-resp-1"}
+%%
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"two docs."},{"functionCall":{"name":"search_docs","args":{"q":"more"}}}]},"finishReason":"STOP"}],"responseId":"gem-resp-1"}

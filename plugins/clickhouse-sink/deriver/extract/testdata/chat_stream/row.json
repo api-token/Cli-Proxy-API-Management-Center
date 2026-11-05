@@ -1,0 +1,2 @@
+{"request_id":"req-chat-1","source_format":"openai","path":"/v1/chat/completions","model":"test-model","stream":true,"outcome":"succeeded","status_code":200,
+ "request_headers":{"user-agent":"OpenAI/Python 1.99.0","content-type":"application/json"}}

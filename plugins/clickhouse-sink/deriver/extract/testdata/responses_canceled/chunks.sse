@@ -1,0 +1,13 @@
+event: response.created
+%%
+data: {"type":"response.created","response":{"id":"resp_test_cancel","status":"in_progress"}}
+%%
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_c","type":"message","role":"assistant","content":[]}}
+%%
+data: {"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"Once upon "}
+%%
+data: {"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"a time"}
+%%
+data: {"type":"response.output_item.added","output_index":1,"item":{"id":"fc_c","type":"function_call","call_id":"call_c1","name":"save","arguments":""}}
+%%
+data: {"type":"response.function_call_arguments.delta","output_index":1,"delta":"{\"title\":\"St"}
