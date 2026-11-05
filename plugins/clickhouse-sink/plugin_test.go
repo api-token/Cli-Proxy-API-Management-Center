@@ -162,6 +162,44 @@ func TestRedactRequestRemovesKnownAndPatternSecrets(t *testing.T) {
 	}
 }
 
+func TestConcurrentRowsNeverSeeEmptySecretSet(t *testing.T) {
+	authDir, env := writeSecretFiles(t)
+	r := newRedactor()
+	r.configure([]string{authDir, env}, nil)
+	var wg sync.WaitGroup
+	leaks := make(chan string, 16)
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			row := requestRow{RequestBody: "x " + knownToken + " " + envSecret}
+			r.redactRequest(&row)
+			if strings.Contains(row.RequestBody, knownToken) || strings.Contains(row.RequestBody, envSecret) {
+				leaks <- row.RequestBody
+			}
+		}()
+	}
+	wg.Wait()
+	close(leaks)
+	for leak := range leaks {
+		t.Errorf("secret survived concurrent redaction: %s", leak)
+	}
+}
+
+func TestPromptCacheKeyIsNotRedacted(t *testing.T) {
+	r := newRedactor()
+	r.configure(nil, nil)
+	body := `{"previous_response_id":null,"prompt_cache_key":"019a4c1e-7d2b-7f00-9c3e-5a1b2c3d4e5f"}`
+	if len(r.detector.DetectString(body)) == 0 {
+		t.Fatal("expected gitleaks to flag the identifier; the test no longer covers the allowlist")
+	}
+	row := requestRow{RequestBody: body}
+	r.redactRequest(&row)
+	if row.RequestBody != body {
+		t.Errorf("identifier was redacted: %s", row.RequestBody)
+	}
+}
+
 func TestRedactorPicksUpRotatedToken(t *testing.T) {
 	authDir, _ := writeSecretFiles(t)
 	r := newRedactor()

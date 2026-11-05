@@ -30,12 +30,29 @@ const (
 	ruleKnown      = "known"
 )
 
+// identifierKeys are request fields that gitleaks' generic rule flags but
+// that hold identifiers, not credentials (Codex sends its conversation ID as
+// prompt_cache_key). Findings whose match names one of them are kept.
+var identifierKeys = []string{"prompt_cache_key"}
+
+func isIdentifierMatch(match string) bool {
+	for _, key := range identifierKeys {
+		if strings.Contains(match, key) {
+			return true
+		}
+	}
+	return false
+}
+
 // secretKey matches JSON/YAML keys whose string values are credentials.
 var secretKey = regexp.MustCompile(`(?i)(token|secret|password|passwd|api[-_]?key|apikey|cookie|credential|private[-_]?key|authorization|session[-_]?key)`)
 
 // redactor replaces credentials in captured rows with
 // [REDACTED:<rule>:<first 8 hex of sha256(secret)>] before anything is stored.
 type redactor struct {
+	// reloadMu is held for a whole reload, so no row is redacted with a
+	// half-loaded secret set.
+	reloadMu  sync.Mutex
 	mu        sync.Mutex
 	files     []string
 	mtimes    map[string]time.Time
@@ -55,9 +72,10 @@ func newRedactor() *redactor {
 	return &redactor{detector: d, known: map[string]string{}, mtimes: map[string]time.Time{}}
 }
 
+// configure sets the secret sources and loads them before returning, so the
+// first request is never redacted against an empty set.
 func (r *redactor) configure(files, disabledRules []string) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.files = files
 	r.disabled = make(map[string]bool, len(disabledRules))
 	for _, rule := range disabledRules {
@@ -65,6 +83,8 @@ func (r *redactor) configure(files, disabledRules []string) {
 	}
 	r.lastCheck = time.Time{}
 	r.mtimes = map[string]time.Time{}
+	r.mu.Unlock()
+	r.reloadIfStale(time.Now())
 }
 
 // redaction collects what was replaced in one row.
@@ -98,7 +118,7 @@ func (r *redactor) newReplacer(texts []string) (*strings.Replacer, map[string]st
 		joined := strings.Join(texts, "\n")
 		for _, finding := range r.detector.DetectString(joined) {
 			secret := finding.Secret
-			if len(secret) < 8 || disabled[finding.RuleID] {
+			if len(secret) < 8 || disabled[finding.RuleID] || isIdentifierMatch(finding.Match) {
 				continue
 			}
 			if _, exists := pairs[secret]; !exists {
@@ -208,12 +228,13 @@ func redactHeaders(rep *strings.Replacer, h map[string]string, rd *redaction) {
 
 // reloadIfStale re-reads the secret files when any of them changed.
 func (r *redactor) reloadIfStale(now time.Time) {
+	r.reloadMu.Lock()
+	defer r.reloadMu.Unlock()
 	r.mu.Lock()
 	if now.Sub(r.lastCheck) < reloadInterval {
 		r.mu.Unlock()
 		return
 	}
-	r.lastCheck = now
 	files := r.files
 	old := r.mtimes
 	r.mu.Unlock()
@@ -232,6 +253,9 @@ func (r *redactor) reloadIfStale(now time.Time) {
 		}
 	}
 	if !changed {
+		r.mu.Lock()
+		r.lastCheck = now
+		r.mu.Unlock()
 		return
 	}
 	known := make(map[string]string)
@@ -243,6 +267,7 @@ func (r *redactor) reloadIfStale(now time.Time) {
 	r.mu.Lock()
 	r.known = known
 	r.mtimes = mtimes
+	r.lastCheck = now
 	r.mu.Unlock()
 }
 
