@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/deriver/extract"
+	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/redact"
 )
 
 const epoch = "1970-01-01 00:00:00.000000000"
@@ -16,13 +17,14 @@ type deriver struct {
 	ch        *clickhouse
 	db        string
 	batchSize int
+	redactor  *redact.Redactor
 	log       *slog.Logger
 	// extract is extract.Extract; tests replace it to inject a poison row.
 	extract func(extract.Row, bool) extract.Facts
 }
 
-func newDeriver(ch *clickhouse, db string, log *slog.Logger) *deriver {
-	return &deriver{ch: ch, db: db, batchSize: 50, log: log, extract: extract.Extract}
+func newDeriver(ch *clickhouse, db string, log *slog.Logger, r *redact.Redactor) *deriver {
+	return &deriver{ch: ch, db: db, batchSize: 50, log: log, extract: extract.Extract, redactor: r}
 }
 
 // setup creates the derived table and views.
@@ -113,6 +115,7 @@ func (d *deriver) safeExtract(r extract.Row, prior bool) (f extract.Facts) {
 		}
 	}()
 	f = d.extract(r, prior)
+	redactFacts(d.redactor, &f)
 	if f.ParseStatus == extract.StatusUnparseable {
 		d.log.Warn("unparseable request", "request_id", r.RequestID, "reason", f.ParseError)
 	}

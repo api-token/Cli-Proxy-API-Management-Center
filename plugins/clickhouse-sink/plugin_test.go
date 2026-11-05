@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/redact"
 )
 
 func call(t *testing.T, p *plugin, method string, payload any) {
@@ -115,6 +117,16 @@ func writeSecretFiles(t *testing.T) (string, string) {
 	return authDir, env
 }
 
+func mustRedactor(t *testing.T, files ...string) *redact.Redactor {
+	t.Helper()
+	r, errNew := redact.New()
+	if errNew != nil {
+		t.Fatal(errNew)
+	}
+	r.Configure(files, nil)
+	return r
+}
+
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if errWrite := os.WriteFile(path, []byte(content), 0o600); errWrite != nil {
@@ -124,8 +136,7 @@ func writeFile(t *testing.T, path, content string) {
 
 func TestRedactRequestRemovesKnownAndPatternSecrets(t *testing.T) {
 	authDir, env := writeSecretFiles(t)
-	r := newRedactor()
-	r.configure([]string{authDir, env}, nil)
+	r := mustRedactor(t, authDir, env)
 
 	b64 := base64.StdEncoding.EncodeToString([]byte(envSecret))
 	row := requestRow{
@@ -136,7 +147,7 @@ func TestRedactRequestRemovesKnownAndPatternSecrets(t *testing.T) {
 		Error:           "upstream said GITHUB_TOKEN=" + patternKey,
 		ResponseHeaders: map[string]string{},
 	}
-	r.redactRequest(&row)
+	redactRequest(r, &row)
 
 	all := row.RequestBody + strings.Join(row.ResponseChunks, "") + row.RequestHeaders["x-custom"] + row.Error
 	for _, secret := range []string{knownToken, envSecret, b64, patternKey} {
@@ -147,7 +158,7 @@ func TestRedactRequestRemovesKnownAndPatternSecrets(t *testing.T) {
 	if !strings.Contains(row.RequestBody, "port 8317") || !strings.Contains(row.RequestBody, "me@example.com") {
 		t.Errorf("non-secret content was removed: %s", row.RequestBody)
 	}
-	if want := marker(ruleKnown, knownToken); !strings.Contains(row.RequestBody, want) || row.RequestHeaders["x-custom"] != want {
+	if want := redact.Marker(redact.RuleKnown, knownToken); !strings.Contains(row.RequestBody, want) || row.RequestHeaders["x-custom"] != want {
 		t.Errorf("known marker %s missing: %s / %v", want, row.RequestBody, row.RequestHeaders)
 	}
 	if !json.Valid([]byte(row.RequestBody)) {
@@ -157,77 +168,38 @@ func TestRedactRequestRemovesKnownAndPatternSecrets(t *testing.T) {
 		t.Errorf("redaction_count = %d", row.RedactionCount)
 	}
 	rules := strings.Join(row.RedactionRules, ",")
-	if !strings.Contains(rules, ruleKnown) || len(row.RedactionRules) < 2 {
+	if !strings.Contains(rules, redact.RuleKnown) || len(row.RedactionRules) < 2 {
 		t.Errorf("redaction_rules = %v", row.RedactionRules)
 	}
 }
 
-func TestConcurrentRowsNeverSeeEmptySecretSet(t *testing.T) {
-	authDir, env := writeSecretFiles(t)
-	r := newRedactor()
-	r.configure([]string{authDir, env}, nil)
-	var wg sync.WaitGroup
-	leaks := make(chan string, 16)
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			row := requestRow{RequestBody: "x " + knownToken + " " + envSecret}
-			r.redactRequest(&row)
-			if strings.Contains(row.RequestBody, knownToken) || strings.Contains(row.RequestBody, envSecret) {
-				leaks <- row.RequestBody
-			}
-		}()
-	}
-	wg.Wait()
-	close(leaks)
-	for leak := range leaks {
-		t.Errorf("secret survived concurrent redaction: %s", leak)
-	}
-}
-
-func TestPromptCacheKeyIsNotRedacted(t *testing.T) {
-	r := newRedactor()
-	r.configure(nil, nil)
-	body := `{"previous_response_id":null,"prompt_cache_key":"019a4c1e-7d2b-7f00-9c3e-5a1b2c3d4e5f"}`
-	if len(r.detector.DetectString(body)) == 0 {
-		t.Fatal("expected gitleaks to flag the identifier; the test no longer covers the allowlist")
-	}
-	row := requestRow{RequestBody: body}
-	r.redactRequest(&row)
-	if row.RequestBody != body {
-		t.Errorf("identifier was redacted: %s", row.RequestBody)
-	}
-}
-
-func TestRedactorPicksUpRotatedToken(t *testing.T) {
+// A model repeating a secret a few characters per delta must not leave the
+// pieces in the stored chunks.
+func TestRedactRequestReplacesSecretSplitAcrossChunks(t *testing.T) {
 	authDir, _ := writeSecretFiles(t)
-	r := newRedactor()
-	r.configure([]string{authDir}, nil)
-	r.reloadIfStale(time.Now())
-
-	rotated := "rotated-access-token-aaaabbbbccccdddd"
-	path := filepath.Join(authDir, "codex-me.json")
-	writeFile(t, path, `{"token":{"access_token":"`+rotated+`"}}`)
-	future := time.Now().Add(time.Minute)
-	if errTouch := os.Chtimes(path, future, future); errTouch != nil {
-		t.Fatal(errTouch)
+	r := mustRedactor(t, authDir)
+	row := requestRow{ResponseChunks: []string{
+		`data: {"choices":[{"delta":{"content":"Sure: oauth-access"}}]}`,
+		`data: {"choices":[{"delta":{"content":"-token-0123"}}]}`,
+		`data: {"choices":[{"delta":{"content":"456789abcdef done"}}]}`,
+		`data: {"choices":[{"delta":{"content":" bye"}}]}`,
+	}}
+	redactRequest(r, &row)
+	joined := strings.Join(row.ResponseChunks, "")
+	for _, piece := range []string{"oauth-access", "-token-0123", "456789abcdef"} {
+		if strings.Contains(joined, piece) {
+			t.Errorf("piece %q of a split secret survived: %q", piece, row.ResponseChunks)
+		}
 	}
-	r.mu.Lock()
-	r.lastCheck = time.Time{} // let the next row re-check the files
-	r.mu.Unlock()
-
-	row := requestRow{RequestBody: "new " + rotated}
-	r.redactRequest(&row)
-	if strings.Contains(row.RequestBody, rotated) {
-		t.Errorf("rotated token survived: %s", row.RequestBody)
+	if !strings.Contains(row.ResponseChunks[3], "bye") || row.RedactionCount != 3 {
+		t.Errorf("chunks = %q count = %d", row.ResponseChunks, row.RedactionCount)
 	}
 }
 
 func TestRedactionFailureEmptiesBodies(t *testing.T) {
-	var r *redactor // a nil redactor panics inside; the row must fail closed
+	var r *redact.Redactor // no redactor: the row must fail closed
 	row := requestRow{RequestBody: knownToken, ResponseChunks: []string{knownToken}, Error: knownToken}
-	r.redactRequest(&row)
+	redactRequest(r, &row)
 	if row.RequestBody != "" || row.ResponseChunks != nil || row.Error != "" || row.RedactionCount != -1 {
 		t.Errorf("row = %+v", row)
 	}
@@ -235,10 +207,9 @@ func TestRedactionFailureEmptiesBodies(t *testing.T) {
 
 func TestRedactUsageFailureBody(t *testing.T) {
 	authDir, _ := writeSecretFiles(t)
-	r := newRedactor()
-	r.configure([]string{authDir}, nil)
+	r := mustRedactor(t, authDir)
 	row := usageRow{FailureBody: `{"error":"bad token ` + knownToken + `"}`, ResponseHeaders: map[string]string{"x-echo": knownToken}}
-	r.redactUsage(&row)
+	redactUsage(r, &row)
 	if strings.Contains(row.FailureBody+row.ResponseHeaders["x-echo"], knownToken) {
 		t.Errorf("usage row kept secret: %+v", row)
 	}

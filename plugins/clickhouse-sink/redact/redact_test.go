@@ -1,0 +1,138 @@
+package redact
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+const (
+	knownToken = "oauth-access-token-0123456789abcdef"
+	envSecret  = "env-password-fedcba9876543210"
+)
+
+func mustNew(t *testing.T) *Redactor {
+	t.Helper()
+	r, errNew := New()
+	if errNew != nil {
+		t.Fatal(errNew)
+	}
+	return r
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if errWrite := os.WriteFile(path, []byte(content), 0o600); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+}
+
+func writeSecretFiles(t *testing.T) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	authDir := filepath.Join(dir, "auth")
+	if errMkdir := os.Mkdir(authDir, 0o700); errMkdir != nil {
+		t.Fatal(errMkdir)
+	}
+	writeFile(t, filepath.Join(authDir, "codex-me.json"), `{"email":"me@example.com","token":{"access_token":"`+knownToken+`","expiry":"2026"}}`)
+	env := filepath.Join(dir, ".env")
+	writeFile(t, env, "PORT=8317\nCLICKHOUSE_PASSWORD="+envSecret+"\n")
+	return authDir, env
+}
+
+func TestSplitSecretOnlyReplacesCarryingChunks(t *testing.T) {
+	authDir, _ := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir}, nil)
+	chunks := []string{
+		"event: content_block_delta",
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"x oauth-access-tok"}}`,
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"en-0123456789abcdef"}}`,
+		`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" fine"}}`,
+	}
+	res := NewResult()
+	r.RedactSplitSecrets(chunks, res)
+	want := Marker(RuleKnown, knownToken)
+	if chunks[0] != "event: content_block_delta" || chunks[1] != want || chunks[2] != want || !strings.Contains(chunks[3], "fine") {
+		t.Errorf("chunks = %q", chunks)
+	}
+	if res.Count != 2 || strings.Join(res.Rules(), ",") != RuleKnown {
+		t.Errorf("count = %d rules = %v", res.Count, res.Rules())
+	}
+}
+
+func TestSecretInsideOneChunkIsLeftToApply(t *testing.T) {
+	authDir, _ := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir}, nil)
+	chunks := []string{`data: {"delta":"` + knownToken + `"}`, `data: {"delta":"next"}`}
+	r.RedactSplitSecrets(chunks, NewResult())
+	if !strings.Contains(chunks[0], knownToken) {
+		t.Errorf("single-chunk secret should be handled by Apply, got %q", chunks)
+	}
+}
+
+func TestConcurrentRowsNeverSeeEmptySecretSet(t *testing.T) {
+	authDir, env := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir, env}, nil)
+	var wg sync.WaitGroup
+	leaks := make(chan string, 16)
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			row := struct{ RequestBody string }{RequestBody: "x " + knownToken + " " + envSecret}
+			row.RequestBody = r.NewReplacer([]string{row.RequestBody}).Apply(row.RequestBody, NewResult())
+			if strings.Contains(row.RequestBody, knownToken) || strings.Contains(row.RequestBody, envSecret) {
+				leaks <- row.RequestBody
+			}
+		}()
+	}
+	wg.Wait()
+	close(leaks)
+	for leak := range leaks {
+		t.Errorf("secret survived concurrent redaction: %s", leak)
+	}
+}
+
+func TestPromptCacheKeyIsNotRedacted(t *testing.T) {
+	r := mustNew(t)
+	r.Configure(nil, nil)
+	body := `{"previous_response_id":null,"prompt_cache_key":"019a4c1e-7d2b-7f00-9c3e-5a1b2c3d4e5f"}`
+	if len(r.detector.DetectString(body)) == 0 {
+		t.Fatal("expected gitleaks to flag the identifier; the test no longer covers the allowlist")
+	}
+	row := struct{ RequestBody string }{RequestBody: body}
+	row.RequestBody = r.NewReplacer([]string{row.RequestBody}).Apply(row.RequestBody, NewResult())
+	if row.RequestBody != body {
+		t.Errorf("identifier was redacted: %s", row.RequestBody)
+	}
+}
+
+func TestRedactorPicksUpRotatedToken(t *testing.T) {
+	authDir, _ := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir}, nil)
+	r.reloadIfStale(time.Now())
+
+	rotated := "rotated-access-token-aaaabbbbccccdddd"
+	path := filepath.Join(authDir, "codex-me.json")
+	writeFile(t, path, `{"token":{"access_token":"`+rotated+`"}}`)
+	future := time.Now().Add(time.Minute)
+	if errTouch := os.Chtimes(path, future, future); errTouch != nil {
+		t.Fatal(errTouch)
+	}
+	r.mu.Lock()
+	r.lastCheck = time.Time{} // let the next row re-check the files
+	r.mu.Unlock()
+
+	row := struct{ RequestBody string }{RequestBody: "new " + rotated}
+	row.RequestBody = r.NewReplacer([]string{row.RequestBody}).Apply(row.RequestBody, NewResult())
+	if strings.Contains(row.RequestBody, rotated) {
+		t.Errorf("rotated token survived: %s", row.RequestBody)
+	}
+}

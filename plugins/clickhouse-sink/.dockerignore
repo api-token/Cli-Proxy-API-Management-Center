@@ -1,0 +1,6 @@
+*.dll
+Dockerfile
+*.dylib
+*.h
+README.md
+*.so

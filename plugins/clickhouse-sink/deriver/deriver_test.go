@@ -48,7 +48,7 @@ func testDeriver(t *testing.T) *deriver {
 			t.Fatalf("raw schema: %v: %s", err, err.(*chError).detail())
 		}
 	}
-	d := newDeriver(ch, testDB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	d := newDeriver(ch, testDB, slog.New(slog.NewTextHandler(io.Discard, nil)), testRedactor(t))
 	if err := d.setup(ctx); err != nil {
 		var detail string
 		if e, ok := err.(*chError); ok {
@@ -163,12 +163,12 @@ func TestCrashBetweenPassesReprocessesNothing(t *testing.T) {
 	}
 
 	// Restart: a fresh process (no in-memory state) finishes the rest.
-	d2 := newDeriver(d.ch, testDB, d.log)
+	d2 := newDeriver(d.ch, testDB, d.log, d.redactor)
 	n, err := d2.pass(context.Background())
 	if err != nil || n != len(rows)-3 {
 		t.Fatalf("resume pass = %d, %v; want %d", n, err, len(rows)-3)
 	}
-	n, err = newDeriver(d.ch, testDB, d.log).pass(context.Background())
+	n, err = newDeriver(d.ch, testDB, d.log, d.redactor).pass(context.Background())
 	if err != nil || n != 0 {
 		t.Fatalf("idle pass = %d, %v; want 0", n, err)
 	}

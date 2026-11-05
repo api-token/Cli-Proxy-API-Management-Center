@@ -357,3 +357,16 @@ func TestInvalidJSONRequest(t *testing.T) {
 	eq(t, "status", f.ParseStatus, StatusUnparseable)
 	eq(t, "conversation", Conversation(Row{SourceFormat: "openai", RequestBody: "{not json"}), "")
 }
+
+func TestSplitSecretMarkersStayInReply(t *testing.T) {
+	m := "[REDACTED:known:0123abcd]"
+	row := Row{
+		RequestID: "r", SourceFormat: "openai", Path: "/v1/chat/completions", Stream: true, Outcome: "succeeded",
+		RequestBody:    `{"model":"m","stream":true,"messages":[{"role":"user","content":"say it"}]}`,
+		ResponseChunks: []string{`data: {"choices":[{"delta":{"content":"ok "}}]}`, m, m, `data: {"choices":[{"delta":{},"finish_reason":"stop"}]}`, "data: [DONE]"},
+	}
+	f := Extract(row, false)
+	if !strings.Contains(f.ReplyText, "ok") || strings.Count(f.ReplyText, m) != 1 {
+		t.Errorf("reply = %q", f.ReplyText)
+	}
+}

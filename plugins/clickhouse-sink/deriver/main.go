@@ -12,8 +12,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/redact"
 )
 
 func main() {
@@ -26,7 +29,14 @@ func main() {
 	defer stop()
 
 	ch := newClickHouse(env("CLICKHOUSE_URL", "http://clickhouse:8123"), os.Getenv("CLICKHOUSE_USER"), os.Getenv("CLICKHOUSE_PASSWORD"))
-	d := newDeriver(ch, env("CLICKHOUSE_DB", "cliproxy"), log)
+	r, errRedact := redact.New()
+	if errRedact != nil {
+		// Never derive text without redaction; compose restarts the service.
+		log.Error("secret redaction unavailable", "err", errRedact)
+		os.Exit(1)
+	}
+	r.Configure(splitList(os.Getenv("REDACT_FILES")), splitList(os.Getenv("REDACT_DISABLED_RULES")))
+	d := newDeriver(ch, env("CLICKHOUSE_DB", "cliproxy"), log, r)
 
 	if err := waitSetup(ctx, d, *interval); err != nil {
 		log.Error("setup aborted", "err", err)
@@ -88,4 +98,15 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// splitList parses a comma-separated env value.
+func splitList(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/redact"
 	"gopkg.in/yaml.v3"
 )
 
@@ -123,12 +124,12 @@ type plugin struct {
 	mu      sync.Mutex
 	sink    *sink
 	capture *capture
-	redact  *redactor
+	redact  *redact.Redactor
 }
 
 var current = &plugin{capture: newCapture()}
 
-func (p *plugin) currentRedactor() *redactor {
+func (p *plugin) currentRedactor() *redact.Redactor {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.redact
@@ -154,9 +155,17 @@ func (p *plugin) configure(raw []byte) error {
 	}
 	p.sink.start()
 	if p.redact == nil {
-		p.redact = newRedactor()
+		r, errRedact := redact.New()
+		if errRedact != nil {
+			// Without a redactor every body is emptied (see redactRequest).
+			logf("secret redaction unavailable, bodies will not be stored: %v", errRedact)
+		} else {
+			p.redact = r
+		}
 	}
-	p.redact.configure(cfg.SecretFiles, cfg.DisabledRules)
+	if p.redact != nil {
+		p.redact.Configure(cfg.SecretFiles, cfg.DisabledRules)
+	}
 	p.capture.setStoreBodies(cfg.StoreBodies)
 	return nil
 }
@@ -231,7 +240,7 @@ func (p *plugin) handle(method string, request []byte) (json.RawMessage, error) 
 		// Model listings and similar calls also complete; they are not inference.
 		if s := p.currentSink(); s != nil && (row.Model != "" || row.RequestedModel != "") {
 			// Redact before the row reaches any buffer, so no layer holds a secret.
-			p.currentRedactor().redactRequest(&row)
+			redactRequest(p.currentRedactor(), &row)
 			s.add(tableRequests, row)
 		}
 		return emptyResult, nil
@@ -243,7 +252,7 @@ func (p *plugin) handle(method string, request []byte) (json.RawMessage, error) 
 		}
 		if s := p.currentSink(); s != nil {
 			row := usageRowFrom(record, p.capture.storeBodies())
-			p.currentRedactor().redactUsage(&row)
+			redactUsage(p.currentRedactor(), &row)
 			s.add(tableUsage, row)
 		}
 		return emptyResult, nil

@@ -16,7 +16,7 @@ import (
 
 // Version is stored in request_facts.extractor_version. Bump it whenever the
 // output for the same raw row changes, then run a rebuild.
-const Version uint16 = 1
+const Version uint16 = 2
 
 // Parse statuses stored in request_facts.parse_status.
 const (
@@ -269,6 +269,13 @@ func extract(row Row, priorSeen bool) Facts {
 		if it.toolName != "" && it.model {
 			f.ToolsCalled = append(f.ToolsCalled, it.toolName)
 		}
+	}
+	// Chunks that carried part of a secret are stored as a bare redaction
+	// marker (see the redact package). Keep the markers in the reply so a
+	// search shows that something was redacted there.
+	if markers := splitMarkers(row.ResponseChunks); len(markers) > 0 {
+		reply = append(reply, strings.Join(markers, " "))
+		f.Messages = append(f.Messages, toMessage("output", uint32(len(p.output)), item{role: "assistant", typ: "message", text: strings.Join(markers, " "), model: true}))
 	}
 	f.ReplyText = strings.Join(reply, "\n")
 	f.ReasoningText = strings.Join(reasoning, "\n")
@@ -729,4 +736,24 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// HashText is the text_hash of s, for callers that rewrite message text
+// after extraction (the deriver's redaction pass).
+func HashText(s string) uint64 { return hashText(s) }
+
+var markerChunk = regexp.MustCompile(`^\[REDACTED:[A-Za-z0-9_.-]+:[0-9a-f]{8}\]$`)
+
+// splitMarkers returns the distinct redaction markers that replaced whole
+// stream chunks, in order.
+func splitMarkers(chunks []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, c := range chunks {
+		if markerChunk.MatchString(c) && !seen[c] {
+			seen[c] = true
+			out = append(out, c)
+		}
+	}
+	return out
 }
