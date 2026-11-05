@@ -58,6 +58,9 @@ func (r *Redactor) RedactSplitSecrets(chunks []string, res *Result) {
 	}
 	for secret, marker := range known {
 		addAll(secret, marker)
+		for _, cut := range truncatedCopies(joined, secret) {
+			addAll(cut, marker)
+		}
 	}
 	if r.detector != nil {
 		for _, finding := range r.detector.DetectString(joined) {

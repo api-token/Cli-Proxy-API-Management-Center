@@ -1,6 +1,7 @@
 package redact
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,4 +136,54 @@ func TestRedactorPicksUpRotatedToken(t *testing.T) {
 	if strings.Contains(row.RequestBody, rotated) {
 		t.Errorf("rotated token survived: %s", row.RequestBody)
 	}
+}
+
+func TestTruncatedKnownSecretIsRedacted(t *testing.T) {
+	authDir, _ := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir}, nil)
+	want := Marker(RuleKnown, knownToken)
+	cases := map[string]string{
+		// A reply cut off by max_tokens partway through the secret.
+		"cut at end":     "the token is " + knownToken[:20],
+		"cut, then text": "the token is " + knownToken[:25] + "... (truncated)",
+		"whole":          "the token is " + knownToken,
+		"base64 cut":     "b64 " + base64Prefix(knownToken, 24),
+	}
+	for name, text := range cases {
+		res := NewResult()
+		out := r.NewReplacer([]string{text}).Apply(text, res)
+		if !strings.Contains(out, want) || strings.Contains(out, knownToken[:minTruncatedLen]) {
+			t.Errorf("%s: got %q", name, out)
+		}
+	}
+	short := "the token is " + knownToken[:minTruncatedLen-1]
+	if out := r.NewReplacer([]string{short}).Apply(short, NewResult()); out != short {
+		t.Errorf("prefix shorter than %d should be kept, got %q", minTruncatedLen, out)
+	}
+	// The cut copy is replaced whole, with no fragment of the secret left over.
+	text := "x " + knownToken[:20] + " y"
+	if out := r.NewReplacer([]string{text}).Apply(text, NewResult()); out != "x "+want+" y" {
+		t.Errorf("got %q", out)
+	}
+}
+
+func TestTruncatedSecretSplitAcrossChunks(t *testing.T) {
+	authDir, _ := writeSecretFiles(t)
+	r := mustNew(t)
+	r.Configure([]string{authDir}, nil)
+	chunks := []string{
+		`data: {"delta":{"text":"x ` + knownToken[:10] + `"}}`,
+		`data: {"delta":{"text":"` + knownToken[10:20] + `"}}`,
+		`data: {"delta":{"stop_reason":"max_tokens"}}`,
+	}
+	r.RedactSplitSecrets(chunks, NewResult())
+	want := Marker(RuleKnown, knownToken)
+	if chunks[0] != want || chunks[1] != want {
+		t.Errorf("chunks = %q", chunks)
+	}
+}
+
+func base64Prefix(s string, n int) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))[:n]
 }

@@ -54,13 +54,16 @@ Secrets are replaced before a row reaches any buffer, so no table ever holds the
   - any other file: one secret per line.
 
   Values shorter than 12 characters are ignored. The files are re-checked at most every 30 seconds, so rotated OAuth tokens are picked up.
+
+  A copy cut off partway, such as a reply stopped by `max_tokens`, is also caught once it holds the secret's first 16 characters. The whole cut-off copy is replaced, up to where it stops matching.
+- **Adding your own secrets:** put one value per line in the plain-text file listed in `redact-files` (`plugins/clickhouse-sink-redact.txt` in the example below). Both the plugin and the deriver read it, and they pick up edits within 30 seconds without a restart. Pointing at a new file needs a config change for the plugin and a `REDACT_FILES` change, then a restart, for the deriver.
 - **Pattern rules** come from gitleaks' default rule set. Codex's `prompt_cache_key` is exempt, because it is a conversation ID, not a credential.
 - **Split secrets:** a secret a model streams back a few characters per chunk is found by joining the chunks' text. Every chunk that carries part of it becomes the marker. The deriver redacts the text it reassembles a second time.
 - **Failures:** if redaction fails, the row is stored with its bodies emptied and `redaction_count = -1`. Nothing is stored unredacted. Query 11 in `queries.sql` audits which rules fired.
 
 Known gaps:
 - a secret inside an image or attachment;
-- a truncated secret, such as a model cut off mid-token by `max_tokens`;
+- a truncated copy of a secret no file lists: gitleaks' provider rules expect the full key, so only values after a keyword such as `password=` are still caught;
 - custom formats that no rule covers and no file lists.
 
 New rules don't apply to rows already stored.
