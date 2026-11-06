@@ -24,7 +24,7 @@ import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
-import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
+import { getQuotaCacheKey, getQuotaTitle } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
@@ -361,7 +361,7 @@ export function QuotaPage() {
 
   const labelFor = useCallback(
     (entry: QuotaFileEntry) =>
-      (showEmails && entry.file.email?.trim()) || getQuotaDisplayName(entry.file),
+      (showEmails && entry.file.email?.trim()) || getQuotaTitle(entry.file, showEmails),
     [showEmails]
   );
 
@@ -585,6 +585,7 @@ export function QuotaPage() {
                     canRefresh={canUseActions && !entry.file.disabled}
                     resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
                     entranceDelayMs={cardEntranceDelay(index)}
+                    showEmails={showEmails}
                     onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
                     onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
                   />

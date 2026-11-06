@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
 import type { ClaudeQuotaState, ResolvedTheme } from '@/types';
 import { resolveQuotaErrorMessage } from '@/utils/quota';
-import { getQuotaDisplayName } from '@/utils/quota/identity';
+import { getQuotaTitle } from '@/utils/quota/identity';
 import {
   getAuthFileIcon,
   getThemeSurfaceIconBackground,
@@ -35,6 +35,8 @@ export type QuotaCardProps = {
   resetting: boolean;
   /** Initial cascade delay; null disables entrance motion for later mounts. */
   entranceDelayMs?: number | null;
+  /** When false, email addresses in the card title are masked. */
+  showEmails: boolean;
   onRefresh: () => void;
   onReset: () => void;
 };
@@ -47,6 +49,7 @@ export function QuotaCard(props: QuotaCardProps) {
     canRefresh,
     resetting,
     entranceDelayMs,
+    showEmails,
     onRefresh,
     onReset,
   } = props;
@@ -55,7 +58,7 @@ export function QuotaCard(props: QuotaCardProps) {
   const file = entry.file;
   const retainedClaudeUsage =
     entry.type === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
-  const displayName = getQuotaDisplayName(file);
+  const displayName = getQuotaTitle(file, showEmails);
 
   // Capture the entrance delay only at mount, without a render-time ref read.
   const [mountEntranceDelayMs] = useState<number | null>(entranceDelayMs ?? null);
