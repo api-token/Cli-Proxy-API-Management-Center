@@ -1638,7 +1638,17 @@
     "pool_duration_dh": "{{d}} д {{h}} ч",
     "pool_duration_hm": "{{h}} ч {{m}} мин",
     "pool_duration_m": "{{m}} мин",
-    "soonest_row_hint": "Восстановится первым у этих учётных данных"
+    "soonest_row_hint": "Восстановится первым у этих учётных данных",
+    "accounts_col_account": "Аккаунт",
+    "accounts_col_plan": "Тариф",
+    "accounts_col_short": "Короткое окно",
+    "accounts_col_long": "Длинное окно",
+    "accounts_col_other": "Другие лимиты",
+    "accounts_col_actions": "Действия",
+    "accounts_period_days": "{{count}} д",
+    "accounts_more": "+{{count}}",
+    "accounts_show_details": "Показать подробности",
+    "accounts_hide_details": "Скрыть подробности"
   },
   "plugin_management": {
     "title": "Управление плагинами",

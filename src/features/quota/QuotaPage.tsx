@@ -1,6 +1,6 @@
 /**
  * Quota page: per-provider pooled capacity charts, with the per-credential
- * card grid behind the "Accounts" toggle.
+ * table behind the "Accounts" toggle.
  *
  * Behavior contracts:
  * - every credential's quota loads once when the page opens (pools need all
@@ -27,11 +27,10 @@ import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey, getQuotaTitle } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
-import { QuotaCard } from './components/QuotaCard';
+import { QuotaAccountsTable } from './components/QuotaAccountsTable';
 import { QuotaPoolChart, type PoolViewMode } from './components/QuotaPoolChart';
 import { QuotaPoolToolbar } from './components/QuotaPoolToolbar';
 import {
-  CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
@@ -60,7 +59,6 @@ import { readQuotaUiState, writeQuotaUiState, type QuotaUiState } from './uiStat
 import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
-const SKELETON_CARD_COUNT = 6;
 /** History also covers the longest burn window before the visible span. */
 const HISTORY_LEAD_MS = 6 * HOUR_MS;
 
@@ -394,24 +392,6 @@ export function QuotaPage() {
       writeQuotaUiState({ [key]: value } as QuotaUiState);
     };
 
-  /* ---------- one-time card entrance cascade ----------
-   * Flip cardsAnimated right after the first batch renders. Mounted cards
-   * captured their delay at mount (useState init in QuotaCard); cards mounted
-   * later (tab/page/refresh) get null — no replay. */
-
-  const [cardsAnimated, setCardsAnimated] = useState(false);
-  const enableCardEntrance = !cardsAnimated && !loading && accountsOpen && pageItems.length > 0;
-  useEffect(() => {
-    if (enableCardEntrance) {
-      setCardsAnimated(true);
-    }
-  }, [enableCardEntrance]);
-  const cardEntranceDelay = (index: number): number | null => {
-    if (!enableCardEntrance) return null;
-    if (pageItems.length <= 1) return 0;
-    return Math.round((index / (pageItems.length - 1)) * CARD_ENTRANCE_BUDGET_MS);
-  };
-
   /* ---------- render ---------- */
 
   const noCredentials = !loading && tabEntries.length === 0;
@@ -559,11 +539,7 @@ export function QuotaPage() {
             </div>
 
             {loading ? (
-              <div className={styles.grid} aria-hidden="true">
-                {Array.from({ length: SKELETON_CARD_COUNT }, (_, index) => (
-                  <Skeleton key={index} height={168} rounded={14} />
-                ))}
-              </div>
+              <Skeleton height={320} rounded={12} />
             ) : isEmpty ? (
               <EmptyState
                 title={t('quota_management.search_empty_title')}
@@ -575,22 +551,16 @@ export function QuotaPage() {
                 }
               />
             ) : (
-              <div className={styles.grid}>
-                {pageItems.map((entry, index) => (
-                  <QuotaCard
-                    key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
-                    entry={entry}
-                    quota={getQuota(entry)}
-                    resolvedTheme={resolvedTheme}
-                    canRefresh={canUseActions && !entry.file.disabled}
-                    resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                    entranceDelayMs={cardEntranceDelay(index)}
-                    showEmails={showEmails}
-                    onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                    onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                  />
-                ))}
-              </div>
+              <QuotaAccountsTable
+                entries={pageItems}
+                getQuota={getQuota}
+                resolvedTheme={resolvedTheme}
+                canUseActions={canUseActions}
+                resettingQuotaName={resettingQuotaName}
+                showEmails={showEmails}
+                onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+              />
             )}
 
             {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (

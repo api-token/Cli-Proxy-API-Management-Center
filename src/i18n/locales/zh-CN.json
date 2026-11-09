@@ -1633,7 +1633,17 @@
     "pool_duration_dh": "{{d}}天{{h}}小时",
     "pool_duration_hm": "{{h}}小时{{m}}分",
     "pool_duration_m": "{{m}}分钟",
-    "soonest_row_hint": "该凭证中最先恢复"
+    "soonest_row_hint": "该凭证中最先恢复",
+    "accounts_col_account": "账号",
+    "accounts_col_plan": "套餐",
+    "accounts_col_short": "短周期",
+    "accounts_col_long": "长周期",
+    "accounts_col_other": "其他限额",
+    "accounts_col_actions": "操作",
+    "accounts_period_days": "{{count}} 天",
+    "accounts_more": "+{{count}}",
+    "accounts_show_details": "显示详情",
+    "accounts_hide_details": "隐藏详情"
   },
   "plugin_management": {
     "title": "插件管理",

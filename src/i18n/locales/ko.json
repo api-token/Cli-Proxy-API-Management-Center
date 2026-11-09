@@ -1635,7 +1635,17 @@
     "pool_duration_dh": "{{d}}일 {{h}}시간",
     "pool_duration_hm": "{{h}}시간 {{m}}분",
     "pool_duration_m": "{{m}}분",
-    "soonest_row_hint": "이 자격 증명에서 가장 먼저 복구됨"
+    "soonest_row_hint": "이 자격 증명에서 가장 먼저 복구됨",
+    "accounts_col_account": "계정",
+    "accounts_col_plan": "플랜",
+    "accounts_col_short": "단기 한도",
+    "accounts_col_long": "장기 한도",
+    "accounts_col_other": "기타 한도",
+    "accounts_col_actions": "작업",
+    "accounts_period_days": "{{count}}일",
+    "accounts_more": "+{{count}}",
+    "accounts_show_details": "세부 정보 표시",
+    "accounts_hide_details": "세부 정보 숨기기"
   },
   "plugin_management": {
     "title": "플러그인 관리",

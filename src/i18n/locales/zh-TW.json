@@ -1661,7 +1661,17 @@
     "pool_duration_dh": "{{d}}天{{h}}小時",
     "pool_duration_hm": "{{h}}小時{{m}}分",
     "pool_duration_m": "{{m}}分鐘",
-    "soonest_row_hint": "該憑證中最先恢復"
+    "soonest_row_hint": "該憑證中最先恢復",
+    "accounts_col_account": "帳號",
+    "accounts_col_plan": "方案",
+    "accounts_col_short": "短週期",
+    "accounts_col_long": "長週期",
+    "accounts_col_other": "其他限額",
+    "accounts_col_actions": "操作",
+    "accounts_period_days": "{{count}} 天",
+    "accounts_more": "+{{count}}",
+    "accounts_show_details": "顯示詳情",
+    "accounts_hide_details": "隱藏詳情"
   },
   "plugin_management": {
     "title": "插件管理",

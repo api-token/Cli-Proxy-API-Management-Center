@@ -2,7 +2,7 @@
  * Provider bodies rendered end-to-end.
  *
  * Bodies receive their class map as a prop and import no stylesheet, so unlike
- * QuotaCard they can be rendered directly here — which is the only place the
+ * QuotaAccountsTable they can be rendered directly here — which is the only place the
  * "absolute plus countdown" pairing is checked as actual markup rather than as
  * a formatter's return value.
  */
