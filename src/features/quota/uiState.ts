@@ -15,6 +15,7 @@ import {
 export type QuotaUiState = {
   tab?: QuotaTabId;
   sortMode?: QuotaSortMode;
+  sortDescending?: boolean;
   viewMode?: 'remaining' | 'drain';
   burnWindowHours?: BurnWindowHours;
   futureUsage?: FutureUsageMode;
@@ -43,6 +44,8 @@ export const readQuotaUiState = (): QuotaUiState | null => {
     return {
       tab: isQuotaTabId(parsed.tab) ? parsed.tab : undefined,
       sortMode: isQuotaSortMode(parsed.sortMode) ? parsed.sortMode : undefined,
+      sortDescending:
+        typeof parsed.sortDescending === 'boolean' ? parsed.sortDescending : undefined,
       viewMode:
         parsed.viewMode === 'remaining' || parsed.viewMode === 'drain'
           ? parsed.viewMode

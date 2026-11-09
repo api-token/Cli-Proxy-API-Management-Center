@@ -1635,7 +1635,17 @@
     "pool_duration_dh": "{{d}}d {{h}}h",
     "pool_duration_hm": "{{h}}h {{m}}m",
     "pool_duration_m": "{{m}}m",
-    "soonest_row_hint": "Recovers first on this credential"
+    "soonest_row_hint": "Recovers first on this credential",
+    "accounts_col_account": "Account",
+    "accounts_col_plan": "Plan",
+    "accounts_col_short": "Short window",
+    "accounts_col_long": "Long window",
+    "accounts_col_other": "Other limits",
+    "accounts_col_actions": "Actions",
+    "accounts_period_days": "{{count}}d",
+    "accounts_more": "+{{count}}",
+    "accounts_show_details": "Show details",
+    "accounts_hide_details": "Hide details"
   },
   "plugin_management": {
     "title": "Plugin Management",

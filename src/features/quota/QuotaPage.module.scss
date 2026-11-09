@@ -59,7 +59,7 @@
   text-align: center;
 }
 
-/* ---------- accounts (card grid) ---------- */
+/* ---------- accounts (table) ---------- */
 
 .accounts {
   display: flex;
@@ -214,17 +214,6 @@
   border-radius: 10px;
   padding: 9px 12px;
   overflow-wrap: anywhere;
-}
-
-/* ---------- 卡片网格 ----------
- * 列宽由 CSS 决定（不再用 JS 测量）：额度卡承载水位条，取 340px 下限，
- * 与认证文件页配额模式（.gridQuota）同一档。 */
-
-.grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
-  align-items: stretch;
 }
 
 /* ---------- 分页 ---------- */

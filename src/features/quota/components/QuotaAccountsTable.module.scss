@@ -1,0 +1,583 @@
+@use '../../../styles/mixins' as *;
+
+/* ============================================================
+ * Accounts table. Dresses the shared ui/Table: fixed column widths so meters
+ * line up down a column, telemetry in mono + tabular-nums like the quota body.
+ *
+ * Three tiers by the width of the accounts section, so nothing ever scrolls
+ * sideways: the full table; below 940px without "Other limits"; below 700px
+ * each row stacks into account + short window + long window. What a tier
+ * drops stays one expand away in the row's detail.
+ * ============================================================ */
+
+.wrap {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.table {
+  table-layout: fixed;
+}
+
+/* The account column takes what the others leave. */
+.colPlan {
+  width: 12%;
+}
+
+.colLimit {
+  width: 18%;
+}
+
+.colOther {
+  width: 22%;
+}
+
+.colActions {
+  width: 92px;
+}
+
+/* Two-class selectors: these override the shared table's `.row td`. */
+.table .row td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.table .rowExpandable {
+  cursor: pointer;
+}
+
+.table .rowOpen td {
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--accent-bg) 50%, transparent);
+}
+
+.none {
+  color: var(--text-quaternary);
+}
+
+/* ---------- sortable column headers ---------- */
+
+/* Negative margin: the hit area grows without moving the label off the column's edge. */
+.sortButton,
+.sortButtonActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: calc(100% + 12px);
+  margin: -4px -6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 0;
+  }
+}
+
+.sortButtonActive {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- account: provider icon + file name ---------- */
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.iconWrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: block;
+}
+
+.iconFallback {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.fileName {
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  @include text-ellipsis;
+}
+
+.notice {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--warning-text);
+}
+
+/* ---------- limit cell: percent + meter, then window length + reset ---------- */
+
+.limit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.limitTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Fixed width so every meter in a column starts at the same x. */
+.limitPercent {
+  flex: 0 0 4ch;
+  font-family: $font-mono;
+  font-size: 12.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.limitMeter {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.limitMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.limitTag {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.limitReset,
+.limitResetSoon,
+.limitLabel {
+  min-width: 0;
+  @include text-ellipsis;
+}
+
+.limitResetSoon {
+  font-weight: 600;
+  color: var(--warning-text);
+}
+
+.limitTag + .limitReset::before,
+.limitTag + .limitResetSoon::before {
+  content: '·';
+  margin-right: 6px;
+  font-weight: 400;
+  color: var(--text-quaternary);
+}
+
+.limitLabel {
+  font-family: $font-family;
+  color: var(--text-secondary);
+}
+
+.limitMore {
+  flex: 0 0 auto;
+  color: var(--text-quaternary);
+}
+
+/* ---------- rows without a reading: idle / loading / error ---------- */
+
+.idle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 6px 10px;
+  cursor: pointer;
+  border: 1px dashed var(--border-color);
+  border-radius: 9px;
+  background: none;
+  font-family: $font-mono;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  transition:
+    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
+    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+.skeleton {
+  display: flex;
+  align-items: center;
+  height: 30px;
+}
+
+/* One steady 1.2s sweep; linear because it is ambient, not a response. */
+.skeletonTrack {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: $radius-full;
+  background-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    color-mix(in srgb, var(--text-primary) 6%, transparent) 50%,
+    transparent 80%
+  );
+  background-repeat: no-repeat;
+  background-size: 220% 100%;
+  animation: quota-row-sweep 1.2s linear infinite;
+}
+
+@keyframes quota-row-sweep {
+  from {
+    background-position: -110% 0;
+  }
+  to {
+    background-position: 210% 0;
+  }
+}
+
+.errorStrip {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--viz-failure);
+  background: color-mix(in srgb, var(--viz-failure) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--viz-failure) 32%, transparent);
+  border-radius: 9px;
+  padding: 6px 10px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- row actions ---------- */
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition:
+    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.spinning {
+  animation: quota-row-spin 0.8s linear infinite;
+}
+
+@keyframes quota-row-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- expanded detail: the provider's full quota body ---------- */
+
+.detailRow td {
+  padding: 4px 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent-bg) 50%, transparent);
+}
+
+.detailRow:last-child td {
+  border-bottom: 0;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The body is a flat run of blocks written for a card column; flow it into
+   as many card-width columns as the row has room for. */
+.detailBody {
+  columns: 300px auto;
+  column-gap: 36px;
+
+  > * {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+}
+
+/* Groups can land side by side here, so drop the divider the body draws
+   between stacked ones. Three classes to outrank that rule. */
+.detail .detailBody .detailGroup {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-full;
+  background: none;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition:
+    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
+    border-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- narrower tiers ---------- */
+
+@container (max-width: 940px) {
+  /* Collapsed, not removed: the cells stay in place so the row's column
+     spans still add up. */
+  .colOther {
+    width: 0;
+  }
+
+  .table .cellOther,
+  .table .row .cellOther {
+    padding-right: 0;
+    padding-left: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    visibility: hidden;
+  }
+
+  .colPlan {
+    width: 14%;
+  }
+
+  .colLimit {
+    width: 23%;
+  }
+}
+
+@container (max-width: 700px) {
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+  }
+
+  .table thead,
+  .table colgroup,
+  .table .row .cellPlan,
+  .table .row .cellOther {
+    display: none;
+  }
+
+  .table .row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 16px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .table .row:last-child {
+    border-bottom: 0;
+  }
+
+  .table .rowOpen {
+    border-bottom-color: transparent;
+    background: color-mix(in srgb, var(--accent-bg) 50%, transparent);
+  }
+
+  /* Cells are grid items here; the row carries the border and background. */
+  .table .row td,
+  .table .row:hover td {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .table .row .cellAccount {
+    grid-column: 1 / -1;
+    padding-right: 68px;
+  }
+
+  .table .row .cellState {
+    grid-column: 1 / -1;
+  }
+
+  .table .row .cellActions {
+    position: absolute;
+    top: 9px;
+    right: 8px;
+  }
+
+  .detailRow td {
+    padding: 2px 14px 14px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .idle:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+    border-style: solid;
+    color: var(--text-secondary);
+  }
+
+  .iconButton:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .sortButton:hover,
+  .sortButtonActive:hover {
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+    color: var(--text-primary);
+  }
+
+  .actionPill:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent);
+    color: var(--text-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle,
+  .iconButton,
+  .actionPill,
+  .sortButton,
+  .sortButtonActive,
+  .chevron,
+  .chevronOpen {
+    transition: none;
+  }
+
+  .idle:active:not(:disabled),
+  .iconButton:active:not(:disabled),
+  .actionPill:active:not(:disabled) {
+    transform: none;
+  }
+
+  .skeletonTrack,
+  .spinning {
+    animation: none;
+  }
+}

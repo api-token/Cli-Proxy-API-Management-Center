@@ -7,6 +7,7 @@ import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { collectQuotaRowInstants, pickUrgentRowId } from '../../resetSchedule';
 import type { QuotaBodyProps } from '../../types';
+import { getMetaWindowLabel } from '../labels';
 
 export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>) {
   const { t, i18n } = useTranslation();
@@ -40,12 +41,7 @@ export function MetaQuotaBody({ quota, classes }: QuotaBodyProps<MetaQuotaState>
           i18n.resolvedLanguage
         );
         const soon = window.id === soonestRowId;
-        const label =
-          window.id === 'window' && window.durationMinutes
-            ? window.durationMinutes % 60 === 0
-              ? t('meta_quota.window_duration_hours', { hours: window.durationMinutes / 60 })
-              : t('meta_quota.window_duration', { minutes: window.durationMinutes })
-            : t(`meta_quota.${window.id}`);
+        const label = getMetaWindowLabel(window, t);
         return (
           <div key={window.id} className={classes.quotaRow}>
             <div className={classes.quotaRowHeader}>

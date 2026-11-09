@@ -13,7 +13,12 @@ import { META_CONFIG } from './providers/meta/data';
 import { PLUGIN_CONFIG } from './providers/plugin/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import type { QuotaProviderType } from './providers/types';
-import { QUOTA_TAB_ORDER, type QuotaSortMode, type QuotaTabId } from './constants';
+import {
+  QUOTA_TAB_ORDER,
+  type QuotaSortColumn,
+  type QuotaSortMode,
+  type QuotaTabId,
+} from './constants';
 
 const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolean> = {
   antigravity: ANTIGRAVITY_CONFIG.filterFn,
@@ -81,18 +86,26 @@ export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string)
   );
 }
 
+/** What a credential sorts by: a number, a name, or null when it has nothing to compare. */
+export type QuotaSortValue = number | string | null;
+
+const compareSortValues = (a: number | string, b: number | string): number =>
+  typeof a === 'number' && typeof b === 'number'
+    ? a - b
+    : String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+
 /**
- * Order the grid by whichever credential recovers first.
+ * Order the accounts by one value per credential: its soonest recovery, or a
+ * table column.
  *
- * The instant is injected rather than read here: quota lives in the store and
+ * The value is injected rather than read here: quota lives in the store and
  * arrives asynchronously, and keeping this function store-free is what makes
  * the ordering rules directly testable.
  *
- * Credentials with no instant — not loaded yet, failed, or reporting no
- * upcoming reset — sink to the bottom rather than sorting as "now". They keep
- * their incoming provider-grouped order, so the unloaded tail still reads like
- * the default view instead of an arbitrary shuffle. Because loading is
- * click-to-fetch, that tail is most of the list until the user asks for data.
+ * Credentials with no value — not loaded yet, failed, or reporting nothing for
+ * that column — sink to the bottom in either direction rather than sorting as
+ * zero. They keep their incoming provider-grouped order, so the unloaded tail
+ * still reads like the default view instead of an arbitrary shuffle.
  *
  * The original index is the final tiebreak, making stability an asserted
  * property rather than an assumption about the engine's sort.
@@ -100,20 +113,35 @@ export function filterEntriesBySearch(entries: QuotaFileEntry[], search: string)
 export function sortQuotaEntries(
   entries: QuotaFileEntry[],
   mode: QuotaSortMode,
-  resolveNextRecoveryMs: (entry: QuotaFileEntry) => number | null
+  resolveSortValue: (entry: QuotaFileEntry) => QuotaSortValue,
+  descending = false
 ): QuotaFileEntry[] {
-  if (mode !== 'soonest') return [...entries];
+  if (mode === 'default') return [...entries];
 
+  const direction = descending ? -1 : 1;
   // Decorate once — resolving pokes at provider-shaped state per entry.
   return entries
-    .map((entry, index) => ({ entry, index, atMs: resolveNextRecoveryMs(entry) }))
+    .map((entry, index) => ({ entry, index, value: resolveSortValue(entry) }))
     .sort((a, b) => {
-      if (a.atMs === null && b.atMs === null) return a.index - b.index;
-      if (a.atMs === null) return 1;
-      if (b.atMs === null) return -1;
-      return a.atMs - b.atMs || a.index - b.index;
+      if (a.value === null && b.value === null) return a.index - b.index;
+      if (a.value === null) return 1;
+      if (b.value === null) return -1;
+      return direction * compareSortValues(a.value, b.value) || a.index - b.index;
     })
     .map((decorated) => decorated.entry);
+}
+
+export interface QuotaSort {
+  mode: QuotaSortMode;
+  descending: boolean;
+}
+
+/** A header click cycles its column: ascending, descending, then back to the default order. */
+export function nextColumnSort(current: QuotaSort, column: QuotaSortColumn): QuotaSort {
+  if (current.mode !== column) return { mode: column, descending: false };
+  return current.descending
+    ? { mode: 'default', descending: false }
+    : { mode: column, descending: true };
 }
 
 export function buildTabCounts(entries: QuotaFileEntry[]): Record<string, number> {
