@@ -7,6 +7,8 @@ import { describe, expect, test } from 'bun:test';
 import type { TFunction } from 'i18next';
 import i18n from '@/i18n';
 import {
+  accountSortValue,
+  hasAccountReading,
   periodParts,
   splitAccountLimits,
   summarizeAccount,
@@ -258,6 +260,52 @@ describe('summarizeAccount', () => {
     expect(summarizeAccount('claude', undefined, t)).toEqual({ plan: null, limits: [] });
     expect(summarizeAccount('plugin', { status: 'error' }, t)).toEqual({ plan: null, limits: [] });
     expect(summarizeAccount('meta', { status: 'error' }, t)).toEqual({ plan: null, limits: [] });
+  });
+});
+
+describe('accountSortValue', () => {
+  const window = (id: string, usedPercent: number, periodHours: number) => ({
+    id,
+    label: id,
+    usedPercent,
+    resetLabel: '-',
+    periodHours,
+  });
+  const quota = {
+    status: 'success',
+    planType: 'plus',
+    windows: [
+      window('five-hour', 10, 5),
+      window('weekly', 70, 168),
+      window('code-review-weekly', 20, 168),
+      window('spark-weekly-0', 95, 168),
+    ],
+  };
+
+  test('each column sorts by what its cell shows', () => {
+    expect(accountSortValue('plan', 'codex', quota, t)).toBe(t('codex_quota.plan_plus'));
+    expect(accountSortValue('short', 'codex', quota, t)).toBe(90);
+    expect(accountSortValue('long', 'codex', quota, t)).toBe(30);
+    // The tightest of the other limits, as the cell shows.
+    expect(accountSortValue('other', 'codex', quota, t)).toBe(5);
+  });
+
+  test('a credential with no reading, or nothing in the column, has no value', () => {
+    expect(accountSortValue('short', 'codex', undefined, t)).toBeNull();
+    expect(accountSortValue('short', 'codex', { ...quota, status: 'error' }, t)).toBeNull();
+    expect(accountSortValue('plan', 'kimi', { status: 'success', rows: [] }, t)).toBeNull();
+    expect(accountSortValue('other', 'kimi', { status: 'success', rows: [] }, t)).toBeNull();
+  });
+
+  test('retained Claude usage still counts as a reading after a failed refresh', () => {
+    const retained = {
+      status: 'error',
+      observedAt: new Date(NOW).toISOString(),
+      windows: [window('five-hour', 25, 5)],
+    };
+    expect(hasAccountReading('claude', retained)).toBe(true);
+    expect(accountSortValue('short', 'claude', retained, t)).toBe(75);
+    expect(hasAccountReading('claude', { status: 'error', windows: [] })).toBe(false);
   });
 });
 

@@ -9,6 +9,7 @@ import {
   isQuotaRefreshDisabled,
   paginate,
   resolveQuotaProviderType,
+  nextColumnSort,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from '@/features/quota/logic';
@@ -253,10 +254,65 @@ describe('sortQuotaEntries', () => {
     expect(input).toEqual(entries);
   });
 
+  test('a column sorts by number in either direction, with unloaded credentials last in both', () => {
+    const remaining = resolver({ 'codex-a.json': 12, 'claude-a.json': 80, 'kimi-a.json': 45 });
+    const unloaded = ['codex-b.json', 'grok-a.json'];
+
+    expect(byName(sortQuotaEntries(entries, 'short', remaining))).toEqual([
+      'codex-a.json',
+      'kimi-a.json',
+      'claude-a.json',
+      ...unloaded,
+    ]);
+    expect(byName(sortQuotaEntries(entries, 'short', remaining, true))).toEqual([
+      'claude-a.json',
+      'kimi-a.json',
+      'codex-a.json',
+      ...unloaded,
+    ]);
+  });
+
+  test('a descending tie still keeps the original position', () => {
+    expect(byName(sortQuotaEntries(entries, 'long', () => 50, true))).toEqual(byName(entries));
+  });
+
+  test('names sort case-insensitively, with digits in numeric order', () => {
+    const names: Record<string, string> = {
+      'claude-a.json': 'team-10',
+      'codex-a.json': 'Team-2',
+      'codex-b.json': 'alpha',
+    };
+    const sorted = sortQuotaEntries(entries, 'account', (entry) => names[entry.file.name] ?? null);
+    expect(byName(sorted).slice(0, 3)).toEqual(['codex-b.json', 'codex-a.json', 'claude-a.json']);
+  });
+
   test('sorts before paginating, so the globally soonest lands on page one', () => {
     // Last in the default order, first to recover.
     const last = entries[entries.length - 1].file.name;
     const sorted = sortQuotaEntries(entries, 'soonest', resolver({ [last]: 1 }));
     expect(paginate(sorted, 1, 2).pageItems[0].file.name).toBe(last);
+  });
+});
+
+describe('nextColumnSort', () => {
+  test('a header cycles ascending, descending, then back to the default order', () => {
+    const first = nextColumnSort({ mode: 'default', descending: false }, 'short');
+    const second = nextColumnSort(first, 'short');
+    const third = nextColumnSort(second, 'short');
+
+    expect(first).toEqual({ mode: 'short', descending: false });
+    expect(second).toEqual({ mode: 'short', descending: true });
+    expect(third).toEqual({ mode: 'default', descending: false });
+  });
+
+  test('another column starts ascending, whatever the current sort', () => {
+    expect(nextColumnSort({ mode: 'short', descending: true }, 'plan')).toEqual({
+      mode: 'plan',
+      descending: false,
+    });
+    expect(nextColumnSort({ mode: 'soonest', descending: false }, 'account')).toEqual({
+      mode: 'account',
+      descending: false,
+    });
   });
 });

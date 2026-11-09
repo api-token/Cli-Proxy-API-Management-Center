@@ -7,7 +7,12 @@
 
 import { Fragment, useId, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconAlertTriangle, IconChevronDown, IconRefreshCw } from '@/components/ui/icons';
+import {
+  IconAlertTriangle,
+  IconChevronDown,
+  IconChevronUp,
+  IconRefreshCw,
+} from '@/components/ui/icons';
 import {
   Table,
   TableBody,
@@ -27,6 +32,7 @@ import {
   isThemeSurfaceIconProvider,
 } from '@/features/authFiles/constants';
 import {
+  hasAccountReading,
   periodParts,
   splitAccountLimits,
   summarizeAccount,
@@ -36,10 +42,10 @@ import {
 } from '../accountSummary';
 import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
-import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
+import type { QuotaSortColumn } from '../constants';
+import { isQuotaRefreshDisabled, type QuotaFileEntry, type QuotaSort } from '../logic';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
 import { ClaudeResetGrantDetails } from '../providers/claude/ClaudeResetGrantDetails';
-import { hasClaudeUsageData } from '../providers/claude/data';
 import { collectQuotaRowInstants, pickUrgentRowId } from '../resetSchedule';
 import { QuotaMeter } from './QuotaMeter';
 import bodyStyles from './QuotaBody.module.scss';
@@ -72,6 +78,9 @@ export interface QuotaAccountsTableProps {
   resettingQuotaName: string | null;
   /** When false, email addresses in account names are masked. */
   showEmails: boolean;
+  sort: QuotaSort;
+  /** A header was clicked; the page decides the next direction. */
+  onSortColumn: (column: QuotaSortColumn) => void;
   onRefresh: (entry: QuotaFileEntry) => void;
   onReset: (entry: QuotaFileEntry) => void;
 }
@@ -83,10 +92,32 @@ export function QuotaAccountsTable({
   canUseActions,
   resettingQuotaName,
   showEmails,
+  sort,
+  onSortColumn,
   onRefresh,
   onReset,
 }: QuotaAccountsTableProps) {
   const { t } = useTranslation();
+  const sortHeader = (column: QuotaSortColumn, className?: string) => {
+    const active = sort.mode === column;
+    const SortIcon = sort.descending ? IconChevronDown : IconChevronUp;
+    return (
+      <TableHead
+        scope="col"
+        className={className}
+        aria-sort={active ? (sort.descending ? 'descending' : 'ascending') : 'none'}
+      >
+        <button
+          type="button"
+          className={active ? styles.sortButtonActive : styles.sortButton}
+          onClick={() => onSortColumn(column)}
+        >
+          {t(`quota_management.accounts_col_${column}`)}
+          {active && <SortIcon size={13} aria-hidden="true" />}
+        </button>
+      </TableHead>
+    );
+  };
 
   return (
     // The wrapper is the size container the table's responsive tiers query.
@@ -106,13 +137,11 @@ export function QuotaAccountsTable({
       >
         <TableHeader>
           <tr>
-            <TableHead scope="col">{t('quota_management.accounts_col_account')}</TableHead>
-            <TableHead scope="col">{t('quota_management.accounts_col_plan')}</TableHead>
-            <TableHead scope="col">{t('quota_management.accounts_col_short')}</TableHead>
-            <TableHead scope="col">{t('quota_management.accounts_col_long')}</TableHead>
-            <TableHead scope="col" className={styles.cellOther}>
-              {t('quota_management.accounts_col_other')}
-            </TableHead>
+            {sortHeader('account')}
+            {sortHeader('plan')}
+            {sortHeader('short')}
+            {sortHeader('long')}
+            {sortHeader('other', styles.cellOther)}
             <TableHead scope="col">
               <span className={styles.srOnly}>{t('quota_management.accounts_col_actions')}</span>
             </TableHead>
@@ -255,9 +284,7 @@ function AccountRow({
 
   const status = quota?.status ?? 'idle';
   const loading = status === 'loading';
-  const retainedClaudeUsage =
-    entry.type === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState | undefined);
-  const hasData = quota !== undefined && (status === 'success' || retainedClaudeUsage);
+  const hasData = hasAccountReading(entry.type, quota);
   const open = expanded && hasData;
 
   const claudeReset = useClaudeResetGrants(

@@ -68,6 +68,14 @@ describe('quota ui state', () => {
     expect(readQuotaUiState()).toEqual({ tab: undefined, sortMode: undefined });
   });
 
+  test('round-trips a column sort and its direction', () => {
+    writeQuotaUiState({ sortMode: 'long', sortDescending: true });
+    expect(readQuotaUiState()).toMatchObject({ sortMode: 'long', sortDescending: true });
+
+    storage.setItem(KEY, JSON.stringify({ sortMode: 'plan', sortDescending: 'yes' }));
+    expect(readQuotaUiState()).toMatchObject({ sortMode: 'plan', sortDescending: undefined });
+  });
+
   test('survives absent, malformed, and non-object payloads', () => {
     expect(readQuotaUiState()).toBeNull();
 

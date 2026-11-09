@@ -34,6 +34,7 @@ import {
   QUOTA_PAGE_SIZE,
   QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
+  type QuotaSortColumn,
   type QuotaSortMode,
   type QuotaTabId,
 } from './constants';
@@ -43,10 +44,14 @@ import {
   classifyQuotaFiles,
   filterEntriesByTab,
   filterEntriesBySearch,
+  nextColumnSort,
   paginate,
   sortQuotaEntries,
   type QuotaFileEntry,
+  type QuotaSort,
+  type QuotaSortValue,
 } from './logic';
+import { accountSortValue } from './accountSummary';
 import { nextRecoveryMs } from './resetSchedule';
 import { buildPool, poolSpan, type BurnWindowHours, type FutureUsageMode } from './poolModel';
 import { buildPoolMembers } from './poolMembers';
@@ -82,6 +87,9 @@ export function QuotaPage() {
   );
   const [futureUsage, setFutureUsage] = useState<FutureUsageMode>(
     () => readQuotaUiState()?.futureUsage ?? 'same'
+  );
+  const [sortDescending, setSortDescending] = useState(
+    () => readQuotaUiState()?.sortDescending ?? false
   );
   const [accountsOpen, setAccountsOpen] = useState(() => readQuotaUiState()?.accountsOpen ?? false);
   const [showEmails, setShowEmails] = useState(() => readQuotaUiState()?.showEmails ?? false);
@@ -180,11 +188,10 @@ export function QuotaPage() {
 
   /* ---------- classify / filter / sort / paginate ---------- */
 
-  // The charts need a running clock. Sorting reads it only in "soonest" mode:
-  // in the default order pageItems must keep its identity across ticks, or the
-  // "refresh all" loading-edge effect below would spin every minute.
+  // The charts need a running clock. Sorting reads it only in "soonest" mode,
+  // so every other order keeps pageItems' identity across minute ticks.
   const now = useNow();
-  const sortNow = sortMode === 'default' ? 0 : now;
+  const sortNow = sortMode === 'soonest' ? now : 0;
 
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
@@ -198,14 +205,19 @@ export function QuotaPage() {
     setPage(1);
   }, []);
 
-  const resolveNextRecovery = useCallback(
-    (entry: QuotaFileEntry) => nextRecoveryMs(entry.type, getQuota(entry), sortNow),
-    [getQuota, sortNow]
+  const resolveSortValue = useCallback(
+    (entry: QuotaFileEntry): QuotaSortValue => {
+      if (sortMode === 'default') return null;
+      if (sortMode === 'soonest') return nextRecoveryMs(entry.type, getQuota(entry), sortNow);
+      if (sortMode === 'account') return entry.file.name;
+      return accountSortValue(sortMode, entry.type, getQuota(entry), t);
+    },
+    [getQuota, sortMode, sortNow, t]
   );
-  // Sort before paginating, or "soonest" would only hold within a page.
+  // Sort before paginating, or the order would only hold within a page.
   const sortedEntries = useMemo(
-    () => sortQuotaEntries(filteredEntries, sortMode, resolveNextRecovery),
-    [filteredEntries, sortMode, resolveNextRecovery]
+    () => sortQuotaEntries(filteredEntries, sortMode, resolveSortValue, sortDescending),
+    [filteredEntries, sortMode, resolveSortValue, sortDescending]
   );
 
   const { pageItems, currentPage, totalPages } = useMemo(
@@ -219,15 +231,34 @@ export function QuotaPage() {
     writeQuotaUiState({ tab: next as QuotaTabId });
   }, []);
 
-  const handleSortModeChange = useCallback((next: string) => {
-    setSortMode(next as QuotaSortMode);
+  const applySort = useCallback((next: QuotaSort) => {
+    setSortMode(next.mode);
+    setSortDescending(next.descending);
     setPage(1);
-    writeQuotaUiState({ sortMode: next as QuotaSortMode });
+    writeQuotaUiState({ sortMode: next.mode, sortDescending: next.descending });
   }, []);
+
+  // The dropdown and the column headers drive the same sort; the dropdown is
+  // the only one of the two on narrow screens, where the table has no header.
+  const handleSortModeChange = useCallback(
+    (next: string) => applySort({ mode: next as QuotaSortMode, descending: false }),
+    [applySort]
+  );
+  const handleColumnSort = useCallback(
+    (column: QuotaSortColumn) =>
+      applySort(nextColumnSort({ mode: sortMode, descending: sortDescending }, column)),
+    [applySort, sortDescending, sortMode]
+  );
 
   const sortOptions = useMemo(
     () =>
-      QUOTA_SORT_MODES.map((mode) => ({ value: mode, label: t(`quota_management.sort_${mode}`) })),
+      QUOTA_SORT_MODES.map((mode) => ({
+        value: mode,
+        label:
+          mode === 'default' || mode === 'soonest'
+            ? t(`quota_management.sort_${mode}`)
+            : t(`quota_management.accounts_col_${mode}`),
+      })),
     [t]
   );
 
@@ -558,6 +589,8 @@ export function QuotaPage() {
                 canUseActions={canUseActions}
                 resettingQuotaName={resettingQuotaName}
                 showEmails={showEmails}
+                sort={{ mode: sortMode, descending: sortDescending }}
+                onSortColumn={handleColumnSort}
                 onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
                 onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
               />

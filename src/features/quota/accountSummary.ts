@@ -23,6 +23,7 @@ import type {
   XaiQuotaState,
 } from '@/types';
 import { parseIsoToMs, resolvePlanTier } from '@/utils/quota';
+import type { QuotaSortColumn } from './constants';
 import {
   resolveAntigravityBucketLabelKey,
   resolveAntigravityGroupLabelKey,
@@ -33,6 +34,7 @@ import {
   getMetaWindowLabel,
   resolveXaiPlan,
 } from './providers/labels';
+import { hasClaudeUsageData } from './providers/claude/data';
 import type { QuotaProviderType } from './providers/types';
 import { XAI_WEEKLY_ROW_ID } from './resetSchedule';
 
@@ -345,4 +347,38 @@ export function periodParts(periodHours: number): { unit: 'hours' | 'days'; coun
   return periodHours < 24
     ? { unit: 'hours', count: Number(periodHours.toFixed(1)) }
     : { unit: 'days', count: Math.round(periodHours / 24) };
+}
+
+/**
+ * Whether a state holds a reading worth showing: a successful one, or Claude
+ * usage retained while a refresh is loading or after it failed.
+ */
+export function hasAccountReading(
+  provider: QuotaProviderType,
+  quota: { status?: string } | undefined
+): boolean {
+  if (!quota) return false;
+  return (
+    quota.status === 'success' ||
+    (provider === 'claude' && hasClaudeUsageData(quota as ClaudeQuotaState))
+  );
+}
+
+/**
+ * What a credential sorts by in one of the table's quota columns: the plan
+ * name, or the remaining percent the column shows. Null when the credential
+ * has no reading or nothing in that column.
+ */
+export function accountSortValue(
+  column: Exclude<QuotaSortColumn, 'account'>,
+  provider: QuotaProviderType,
+  quota: { status?: string } | undefined,
+  t: TFunction
+): number | string | null {
+  if (!hasAccountReading(provider, quota)) return null;
+  const summary = summarizeAccount(provider, quota, t);
+  if (column === 'plan') return summary.plan?.label ?? null;
+  const columns = splitAccountLimits(summary.limits);
+  const limit = column === 'other' ? tightestLimit(columns.others) : columns[column];
+  return limit?.remaining ?? null;
 }

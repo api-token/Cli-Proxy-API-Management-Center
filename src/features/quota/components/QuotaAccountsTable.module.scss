@@ -55,6 +55,39 @@
   color: var(--text-quaternary);
 }
 
+/* ---------- sortable column headers ---------- */
+
+/* Negative margin: the hit area grows without moving the label off the column's edge. */
+.sortButton,
+.sortButtonActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: calc(100% + 12px);
+  margin: -4px -6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 0;
+  }
+}
+
+.sortButtonActive {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -513,6 +546,12 @@
     color: var(--text-primary);
   }
 
+  .sortButton:hover,
+  .sortButtonActive:hover {
+    background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+    color: var(--text-primary);
+  }
+
   .actionPill:hover:not(:disabled) {
     border-color: var(--border-hover);
     background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent);
@@ -524,6 +563,8 @@
   .idle,
   .iconButton,
   .actionPill,
+  .sortButton,
+  .sortButtonActive,
   .chevron,
   .chevronOpen {
     transition: none;
