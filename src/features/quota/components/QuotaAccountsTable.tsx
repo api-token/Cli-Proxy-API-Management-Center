@@ -60,8 +60,6 @@ const detailClasses = {
   antigravityQuotaGroup: `${quotaClasses.antigravityQuotaGroup} ${styles.detailGroup}`,
 };
 
-const COLUMN_COUNT = 6;
-
 const planClass = (tier: AccountPlan['tier']): string =>
   tier === 'elite'
     ? quotaClasses.elitePlanValue
@@ -71,6 +69,8 @@ const planClass = (tier: AccountPlan['tier']): string =>
 
 export interface QuotaAccountsTableProps {
   entries: QuotaFileEntry[];
+  /** False when no listed account has a short window, which drops that column. */
+  showShortColumn: boolean;
   getQuota: (entry: QuotaFileEntry) => QuotaCardState | undefined;
   resolvedTheme: ResolvedTheme;
   canUseActions: boolean;
@@ -87,6 +87,7 @@ export interface QuotaAccountsTableProps {
 
 export function QuotaAccountsTable({
   entries,
+  showShortColumn,
   getQuota,
   resolvedTheme,
   canUseActions,
@@ -128,7 +129,7 @@ export function QuotaAccountsTable({
           <>
             <col />
             <col className={styles.colPlan} />
-            <col className={styles.colLimit} />
+            {showShortColumn && <col className={styles.colLimit} />}
             <col className={styles.colLimit} />
             <col className={styles.colOther} />
             <col className={styles.colActions} />
@@ -139,7 +140,7 @@ export function QuotaAccountsTable({
           <tr>
             {sortHeader('account')}
             {sortHeader('plan')}
-            {sortHeader('short')}
+            {showShortColumn && sortHeader('short')}
             {sortHeader('long')}
             {sortHeader('other', styles.cellOther)}
             <TableHead scope="col">
@@ -154,6 +155,7 @@ export function QuotaAccountsTable({
               <AccountRow
                 key={`${entry.type}:${key}`}
                 entry={entry}
+                showShortColumn={showShortColumn}
                 quota={getQuota(entry)}
                 resolvedTheme={resolvedTheme}
                 canRefresh={canUseActions && !entry.file.disabled}
@@ -255,6 +257,7 @@ function LimitCell({
 
 interface AccountRowProps {
   entry: QuotaFileEntry;
+  showShortColumn: boolean;
   quota?: QuotaCardState;
   resolvedTheme: ResolvedTheme;
   canRefresh: boolean;
@@ -266,6 +269,7 @@ interface AccountRowProps {
 
 function AccountRow({
   entry,
+  showShortColumn,
   quota,
   resolvedTheme,
   canRefresh,
@@ -421,14 +425,16 @@ function AccountRow({
         </TableCell>
         {columns ? (
           <>
-            <TableCell>
-              <LimitCell
-                limit={columns.short}
-                urgent={columns.short?.id === urgentRowId}
-                now={now}
-              />
-            </TableCell>
-            <TableCell>
+            {showShortColumn && (
+              <TableCell>
+                <LimitCell
+                  limit={columns.short}
+                  urgent={columns.short?.id === urgentRowId}
+                  now={now}
+                />
+              </TableCell>
+            )}
+            <TableCell className={showShortColumn ? undefined : styles.cellSoleLimit}>
               <LimitCell limit={columns.long} urgent={columns.long?.id === urgentRowId} now={now} />
             </TableCell>
             <TableCell className={styles.cellOther}>
@@ -449,7 +455,7 @@ function AccountRow({
             </TableCell>
           </>
         ) : (
-          <TableCell colSpan={3} className={styles.cellState}>
+          <TableCell colSpan={showShortColumn ? 3 : 2} className={styles.cellState}>
             {status === 'error' ? (
               <div className={styles.errorStrip} role="alert">
                 {errorText}
@@ -509,7 +515,7 @@ function AccountRow({
       </TableRow>
       {open && quota && (
         <tr className={styles.detailRow}>
-          <td colSpan={COLUMN_COUNT} id={detailId}>
+          <td colSpan={showShortColumn ? 6 : 5} id={detailId}>
             <div className={styles.detail}>
               {status === 'error' && (
                 <div className={styles.errorStrip} role="alert">

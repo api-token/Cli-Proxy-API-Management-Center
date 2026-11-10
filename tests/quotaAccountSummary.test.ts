@@ -9,6 +9,7 @@ import i18n from '@/i18n';
 import {
   accountSortValue,
   hasAccountReading,
+  hasShortWindow,
   periodParts,
   splitAccountLimits,
   summarizeAccount,
@@ -351,5 +352,41 @@ describe('column helpers', () => {
     expect(periodParts(24)).toEqual({ unit: 'days', count: 1 });
     expect(periodParts(168)).toEqual({ unit: 'days', count: 7 });
     expect(periodParts(720)).toEqual({ unit: 'days', count: 30 });
+  });
+});
+
+describe('hasShortWindow', () => {
+  const codexWindow = (id: string, periodHours: number, usedPercent: number | null = 10) => ({
+    id,
+    label: id,
+    usedPercent,
+    resetLabel: '',
+    periodHours,
+  });
+
+  test('a window of a day or less counts; a longer one does not', () => {
+    const withShort = { status: 'success', windows: [codexWindow('five-hour', 5)] };
+    const dayLong = { status: 'success', windows: [codexWindow('five-hour', 24)] };
+    const longOnly = { status: 'success', windows: [codexWindow('weekly', 168)] };
+    expect(hasShortWindow('codex', withShort, t)).toBe(true);
+    expect(hasShortWindow('codex', dayLong, t)).toBe(true);
+    expect(hasShortWindow('codex', longOnly, t)).toBe(false);
+  });
+
+  test('a short window with unknown usage still fills the column', () => {
+    const quota = { status: 'success', windows: [codexWindow('five-hour', 5, null)] };
+    expect(hasShortWindow('codex', quota, t)).toBe(true);
+  });
+
+  test('a scoped short window stays out of the column', () => {
+    const quota = { status: 'success', windows: [codexWindow('spark-five-hour', 5)] };
+    expect(hasShortWindow('codex', quota, t)).toBe(false);
+  });
+
+  test('a credential with no reading does not count', () => {
+    const windows = [codexWindow('five-hour', 5)];
+    expect(hasShortWindow('codex', undefined, t)).toBe(false);
+    expect(hasShortWindow('codex', { status: 'loading', windows }, t)).toBe(false);
+    expect(hasShortWindow('codex', { status: 'error', windows }, t)).toBe(false);
   });
 });

@@ -51,7 +51,7 @@ import {
   type QuotaSort,
   type QuotaSortValue,
 } from './logic';
-import { accountSortValue } from './accountSummary';
+import { accountSortValue, hasShortWindow } from './accountSummary';
 import { nextRecoveryMs } from './resetSchedule';
 import { buildPool, poolSpan, type BurnWindowHours, type FutureUsageMode } from './poolModel';
 import { buildPoolMembers } from './poolMembers';
@@ -225,6 +225,12 @@ export function QuotaPage() {
     [sortedEntries, page]
   );
 
+  // Decided across every page, so the column doesn't come and go while paging.
+  const showShortColumn = useMemo(
+    () => filteredEntries.some((entry) => hasShortWindow(entry.type, getQuota(entry), t)),
+    [filteredEntries, getQuota, t]
+  );
+
   const handleTabChange = useCallback((next: string) => {
     setTab(next as QuotaTabId);
     setPage(1);
@@ -252,14 +258,17 @@ export function QuotaPage() {
 
   const sortOptions = useMemo(
     () =>
-      QUOTA_SORT_MODES.map((mode) => ({
-        value: mode,
-        label:
-          mode === 'default' || mode === 'soonest'
-            ? t(`quota_management.sort_${mode}`)
-            : t(`quota_management.accounts_col_${mode}`),
-      })),
-    [t]
+      QUOTA_SORT_MODES
+        // A saved short-window sort stays listed so the dropdown still names it.
+        .filter((mode) => mode !== 'short' || showShortColumn || sortMode === 'short')
+        .map((mode) => ({
+          value: mode,
+          label:
+            mode === 'default' || mode === 'soonest'
+              ? t(`quota_management.sort_${mode}`)
+              : t(`quota_management.accounts_col_${mode}`),
+        })),
+    [showShortColumn, sortMode, t]
   );
 
   const { loadedCount, attentionCount } = useMemo(() => {
@@ -584,6 +593,7 @@ export function QuotaPage() {
             ) : (
               <QuotaAccountsTable
                 entries={pageItems}
+                showShortColumn={showShortColumn}
                 getQuota={getQuota}
                 resolvedTheme={resolvedTheme}
                 canUseActions={canUseActions}
