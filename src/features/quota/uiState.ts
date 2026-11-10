@@ -19,7 +19,6 @@ export type QuotaUiState = {
   viewMode?: 'remaining' | 'drain';
   burnWindowHours?: BurnWindowHours;
   futureUsage?: FutureUsageMode;
-  accountsOpen?: boolean;
   showEmails?: boolean;
 };
 
@@ -56,7 +55,6 @@ export const readQuotaUiState = (): QuotaUiState | null => {
       futureUsage: (FUTURE_USAGE_MODES as readonly unknown[]).includes(parsed.futureUsage)
         ? parsed.futureUsage
         : undefined,
-      accountsOpen: typeof parsed.accountsOpen === 'boolean' ? parsed.accountsOpen : undefined,
       showEmails: typeof parsed.showEmails === 'boolean' ? parsed.showEmails : undefined,
     };
   } catch {

@@ -91,7 +91,6 @@ export function QuotaPage() {
   const [sortDescending, setSortDescending] = useState(
     () => readQuotaUiState()?.sortDescending ?? false
   );
-  const [accountsOpen, setAccountsOpen] = useState(() => readQuotaUiState()?.accountsOpen ?? false);
   const [showEmails, setShowEmails] = useState(() => readQuotaUiState()?.showEmails ?? false);
   const [spanOffset, setSpanOffset] = useState(0);
   const [historyRefresh, setHistoryRefresh] = useState(0);
@@ -469,8 +468,6 @@ export function QuotaPage() {
           onBurnWindowChange={updateUi('burnWindowHours', setBurnWindowHours)}
           futureUsage={futureUsage}
           onFutureUsageChange={updateUi('futureUsage', setFutureUsage)}
-          accountsOpen={accountsOpen}
-          onToggleAccounts={() => updateUi('accountsOpen', setAccountsOpen)(!accountsOpen)}
           span={span}
           offset={spanOffset}
           onOffsetChange={setSpanOffset}
@@ -534,9 +531,8 @@ export function QuotaPage() {
           </div>
         )}
 
-        {accountsOpen && !noCredentials && (
+        {!noCredentials && (
           <section
-            id="quota-accounts"
             className={styles.accounts}
             aria-label={t('quota_management.pool_accounts_toggle')}
           >

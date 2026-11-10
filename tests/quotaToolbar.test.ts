@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync('src/features/quota/QuotaPage.tsx', 'utf8');
 const styles = readFileSync('src/features/quota/QuotaPage.module.scss', 'utf8');
+const poolToolbar = readFileSync('src/features/quota/components/QuotaPoolToolbar.tsx', 'utf8');
 
 describe('quota toolbar presentation contracts', () => {
   test('uses a named, explicit clear action and restores input focus', () => {
@@ -28,5 +29,11 @@ describe('quota toolbar presentation contracts', () => {
     expect(styles).toContain('&:focus-within');
     expect(styles).toContain('&:focus-visible');
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
+  });
+
+  test('always shows the accounts section, with no toggle to hide it', () => {
+    expect(source).toContain('{!noCredentials && (\n          <section');
+    expect(source).not.toContain('accountsOpen');
+    expect(poolToolbar).not.toContain('aria-expanded');
   });
 });
