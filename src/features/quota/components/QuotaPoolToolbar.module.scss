@@ -93,16 +93,10 @@
   }
 }
 
-.toggle,
 .today {
   @extend %control;
   padding: 0 12px;
   border: 1px solid var(--border-color);
-}
-
-.toggle[aria-expanded='true'] {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
 }
 
 .iconButton {
@@ -116,7 +110,6 @@
 
 @media (hover: hover) and (pointer: fine) {
   .segmented button:hover,
-  .toggle:hover,
   .today:hover:not(:disabled),
   .iconButton:hover {
     color: var(--text-primary);
@@ -126,7 +119,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .segmented button,
-  .toggle,
   .today,
   .iconButton {
     transition: none;

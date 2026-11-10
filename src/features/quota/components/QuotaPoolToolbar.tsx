@@ -18,8 +18,6 @@ export interface QuotaPoolToolbarProps {
   onBurnWindowChange: (hours: BurnWindowHours) => void;
   futureUsage: FutureUsageMode;
   onFutureUsageChange: (mode: FutureUsageMode) => void;
-  accountsOpen: boolean;
-  onToggleAccounts: () => void;
   span: { startMs: number; endMs: number };
   offset: number;
   onOffsetChange: (offset: number) => void;
@@ -34,8 +32,6 @@ export function QuotaPoolToolbar({
   onBurnWindowChange,
   futureUsage,
   onFutureUsageChange,
-  accountsOpen,
-  onToggleAccounts,
   span,
   offset,
   onOffsetChange,
@@ -110,16 +106,6 @@ export function QuotaPoolToolbar({
             size="sm"
           />
         </div>
-
-        <button
-          type="button"
-          className={styles.toggle}
-          aria-expanded={accountsOpen}
-          aria-controls="quota-accounts"
-          onClick={onToggleAccounts}
-        >
-          {t('quota_management.pool_accounts_toggle')}
-        </button>
       </div>
 
       <div className={styles.range}>
