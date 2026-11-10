@@ -519,7 +519,8 @@
     padding-right: 68px;
   }
 
-  .table .row .cellState {
+  .table .row .cellState,
+  .table .row .cellSoleLimit {
     grid-column: 1 / -1;
   }
 

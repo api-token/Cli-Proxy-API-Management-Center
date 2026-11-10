@@ -333,6 +333,16 @@ export function splitAccountLimits(limits: readonly AccountLimit[]): AccountLimi
   return { short, long, others: limits.filter((limit) => limit !== short && limit !== long) };
 }
 
+/** Whether a credential's reading fills the table's short-window column. */
+export function hasShortWindow(
+  provider: QuotaProviderType,
+  quota: { status?: string } | undefined,
+  t: TFunction
+): boolean {
+  if (!hasAccountReading(provider, quota)) return false;
+  return splitAccountLimits(summarizeAccount(provider, quota, t).limits).short !== null;
+}
+
 /** The limit with the least remaining. Unknown usage ranks last; the first wins a tie. */
 export function tightestLimit(limits: readonly AccountLimit[]): AccountLimit | null {
   let best: AccountLimit | null = null;
