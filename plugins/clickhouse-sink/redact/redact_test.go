@@ -187,3 +187,49 @@ func TestTruncatedSecretSplitAcrossChunks(t *testing.T) {
 func base64Prefix(s string, n int) string {
 	return base64.StdEncoding.EncodeToString([]byte(s))[:n]
 }
+
+func TestBodySegments(t *testing.T) {
+	got := bodySegments(`{"model":"m","messages":[{"role":"user"},"x"],"stream":true}`)
+	want := []string{`"model":"m"`, `{"role":"user"}`, `"x"`, `"stream":true`}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("segments = %q, want %q", got, want)
+	}
+	if got := bodySegments("not json"); len(got) != 1 || got[0] != "not json" {
+		t.Errorf("non-object body = %q", got)
+	}
+	if got := bodySegments(""); got != nil {
+		t.Errorf("empty body = %q", got)
+	}
+}
+
+func TestRequestReplacerCachesBodySegments(t *testing.T) {
+	r := mustNew(t)
+	r.Configure(nil, nil)
+	// A key in the format gitleaks recognises (GitHub personal access token).
+	const patternKey = "ghp_R2d2C3poBB8LukeLeiaHanSolo0123456789"
+	turn1 := `{"model":"m","messages":[{"role":"user","content":"hi"},{"role":"assistant","content":"use ` + patternKey + `"}]}`
+	turn2 := `{"model":"m","messages":[{"role":"user","content":"hi"},{"role":"assistant","content":"use ` + patternKey + `"},{"role":"user","content":"thanks"}]}`
+
+	res := NewResult()
+	out := r.NewRequestReplacer(turn1, nil).Apply(turn1, res)
+	if strings.Contains(out, patternKey) || res.Count != 1 {
+		t.Fatalf("turn 1 not redacted: count = %d body = %s", res.Count, out)
+	}
+	if len(r.segments) != 3 {
+		t.Fatalf("cached segments after turn 1 = %d, want 3", len(r.segments))
+	}
+
+	// The resent message's finding comes from the cache and still redacts the
+	// whole row, including a reply that repeats the key.
+	reply := `data: {"delta":"` + patternKey + `"}`
+	rep := r.NewRequestReplacer(turn2, []string{reply})
+	res = NewResult()
+	out = rep.Apply(turn2, res)
+	reply = rep.Apply(reply, res)
+	if strings.Contains(out, patternKey) || strings.Contains(reply, patternKey) || res.Count != 2 {
+		t.Errorf("turn 2 not redacted: count = %d body = %s reply = %s", res.Count, out, reply)
+	}
+	if len(r.segments) != 4 {
+		t.Errorf("cached segments after turn 2 = %d, want 4 (only the new message)", len(r.segments))
+	}
+}

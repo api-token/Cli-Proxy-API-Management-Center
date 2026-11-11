@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/tidwall/gjson"
 	"github.com/zricethezav/gitleaks/v8/detect"
 	"github.com/zricethezav/gitleaks/v8/logging"
 	"gopkg.in/yaml.v3"
@@ -36,6 +37,9 @@ const (
 	// reloadInterval bounds how often secret files are checked for changes.
 	// CPA rotates OAuth access tokens, so the known set must follow them.
 	reloadInterval = 30 * time.Second
+	// maxCachedSegments bounds the request-body findings cache. When it is
+	// full it is emptied, and the next bodies are scanned again once.
+	maxCachedSegments = 50000
 	// RuleKnown names matches of configured secret values.
 	RuleKnown = "known"
 )
@@ -70,6 +74,18 @@ type Redactor struct {
 	disabled  map[string]bool
 
 	detector *detect.Detector
+
+	// cacheMu guards segments: pattern findings per request-body segment,
+	// keyed by the segment's sha256. Findings depend only on the segment and
+	// the fixed rule set, so a secret reload does not invalidate them.
+	cacheMu  sync.Mutex
+	segments map[[32]byte][]finding
+}
+
+// finding is a pattern-rule match kept for redaction.
+type finding struct {
+	secret string
+	rule   string
 }
 
 // New returns a Redactor with gitleaks' default rules. It returns an error
@@ -80,7 +96,12 @@ func New() (*Redactor, error) {
 	if errDetector != nil {
 		return nil, errDetector
 	}
-	return &Redactor{detector: d, known: map[string]string{}, mtimes: map[string]time.Time{}}, nil
+	return &Redactor{
+		detector: d,
+		known:    map[string]string{},
+		mtimes:   map[string]time.Time{},
+		segments: map[[32]byte][]finding{},
+	}, nil
 }
 
 // Configure sets the secret sources and loads them before returning, so the
@@ -134,6 +155,17 @@ func (rp *Replacer) Apply(s string, res *Result) string {
 // NewReplacer builds a replacer for one row: the known secrets plus whatever
 // the pattern rules find anywhere in the row's texts.
 func (r *Redactor) NewReplacer(texts []string) *Replacer {
+	return r.NewRequestReplacer("", texts)
+}
+
+// NewRequestReplacer is NewReplacer for a row with a request body. Agent
+// clients resend the whole conversation every turn, so the body is scanned one
+// segment at a time (each top-level array element, and each other top-level
+// field) and each segment's findings are cached. A resent message is then not
+// scanned again, and the scan cost no longer grows faster than the body.
+// Pattern matches are local, so a segment yields the same findings on its own
+// as inside the body. The returned replacer still applies to the whole row.
+func (r *Redactor) NewRequestReplacer(body string, texts []string) *Replacer {
 	r.reloadIfStale(time.Now())
 	r.mu.Lock()
 	known, disabled := r.known, r.disabled // replaced on reload, never mutated
@@ -142,8 +174,12 @@ func (r *Redactor) NewReplacer(texts []string) *Replacer {
 	for secret, replacement := range known {
 		pairs[secret] = replacement
 	}
+	all := texts
+	if body != "" {
+		all = append([]string{body}, texts...)
+	}
 	for secret, replacement := range known {
-		for _, text := range texts {
+		for _, text := range all {
 			for _, cut := range truncatedCopies(text, secret) {
 				if _, exists := pairs[cut]; !exists {
 					pairs[cut] = replacement
@@ -153,14 +189,17 @@ func (r *Redactor) NewReplacer(texts []string) *Replacer {
 	}
 
 	if r.detector != nil {
-		joined := strings.Join(texts, "\n")
-		for _, finding := range r.detector.DetectString(joined) {
-			secret := finding.Secret
-			if len(secret) < 8 || disabled[finding.RuleID] || isIdentifierMatch(finding.Match) {
+		var findings []finding
+		for _, segment := range bodySegments(body) {
+			findings = append(findings, r.detectCached(segment)...)
+		}
+		findings = append(findings, r.detect(strings.Join(texts, "\n"))...)
+		for _, f := range findings {
+			if disabled[f.rule] {
 				continue
 			}
-			if _, exists := pairs[secret]; !exists {
-				pairs[secret] = Marker(finding.RuleID, secret)
+			if _, exists := pairs[f.secret]; !exists {
+				pairs[f.secret] = Marker(f.rule, f.secret)
 			}
 		}
 	}
@@ -178,6 +217,66 @@ func (r *Redactor) NewReplacer(texts []string) *Replacer {
 		args = append(args, secret, pairs[secret])
 	}
 	return &Replacer{rep: strings.NewReplacer(args...), pairs: pairs}
+}
+
+// detect runs the pattern rules over s and keeps the findings worth redacting.
+func (r *Redactor) detect(s string) []finding {
+	if s == "" {
+		return nil
+	}
+	var out []finding
+	for _, f := range r.detector.DetectString(s) {
+		if len(f.Secret) < 8 || isIdentifierMatch(f.Match) {
+			continue
+		}
+		out = append(out, finding{secret: f.Secret, rule: f.RuleID})
+	}
+	return out
+}
+
+// detectCached is detect for one request-body segment, cached by its hash.
+func (r *Redactor) detectCached(segment string) []finding {
+	key := sha256.Sum256([]byte(segment))
+	r.cacheMu.Lock()
+	cached, ok := r.segments[key]
+	r.cacheMu.Unlock()
+	if ok {
+		return cached
+	}
+	found := r.detect(segment)
+	r.cacheMu.Lock()
+	if len(r.segments) >= maxCachedSegments {
+		r.segments = map[[32]byte][]finding{}
+	}
+	r.segments[key] = found
+	r.cacheMu.Unlock()
+	return found
+}
+
+// bodySegments splits a JSON object body into the units clients resend
+// unchanged: each element of a top-level array, and each other top-level
+// field with its key. Any other body is a single segment.
+func bodySegments(body string) []string {
+	if body == "" {
+		return nil
+	}
+	parsed := gjson.Parse(body)
+	if !parsed.IsObject() {
+		return []string{body}
+	}
+	var out []string
+	parsed.ForEach(func(key, value gjson.Result) bool {
+		if value.IsArray() {
+			value.ForEach(func(_, element gjson.Result) bool {
+				out = append(out, element.Raw)
+				return true
+			})
+			return true
+		}
+		out = append(out, key.Raw+":"+value.Raw)
+		return true
+	})
+	return out
 }
 
 // truncatedCopies returns the cut-off copies of secret in text: each place

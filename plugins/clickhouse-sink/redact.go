@@ -16,11 +16,11 @@ func redactRequest(r *redact.Redactor, row *requestRow) {
 		failClosed(row)
 		return
 	}
-	texts := []string{row.Error, row.RequestBody, row.ResponseBody}
+	texts := []string{row.Error, row.ResponseBody}
 	texts = append(texts, headerValues(row.RequestHeaders)...)
 	texts = append(texts, headerValues(row.ResponseHeaders)...)
 	texts = append(texts, row.ResponseChunks...)
-	rep := r.NewReplacer(texts)
+	rep := r.NewRequestReplacer(row.RequestBody, texts)
 	res := redact.NewResult()
 	row.Error = rep.Apply(row.Error, res)
 	row.RequestBody = rep.Apply(row.RequestBody, res)
