@@ -58,6 +58,7 @@ Secrets are replaced before a row reaches any buffer, so no table ever holds the
   A copy cut off partway, such as a reply stopped by `max_tokens`, is also caught once it holds the secret's first 16 characters. The whole cut-off copy is replaced, up to where it stops matching.
 - **Adding your own secrets:** put one value per line in the plain-text file listed in `redact-files` (`plugins/clickhouse-sink-redact.txt` in the example below). Both the plugin and the deriver read it, and they pick up edits within 30 seconds without a restart. Pointing at a new file needs a config change for the plugin and a `REDACT_FILES` change, then a restart, for the deriver.
 - **Pattern rules** come from gitleaks' default rule set. Codex's `prompt_cache_key` is exempt, because it is a conversation ID, not a credential.
+  Agent clients resend the whole conversation every turn, so the request body is scanned one message (top-level array element or field) at a time and each message's findings are cached by hash. Only new messages are scanned, which keeps the cost of multi-megabyte bodies low.
 - **Split secrets:** a secret a model streams back a few characters per chunk is found by joining the chunks' text. Every chunk that carries part of it becomes the marker. The deriver redacts the text it reassembles a second time.
 - **Failures:** if redaction fails, the row is stored with its bodies emptied and `redaction_count = -1`. Nothing is stored unredacted. Query 11 in `queries.sql` audits which rules fired.
 
