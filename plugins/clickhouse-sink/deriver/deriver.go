@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/api-token/Cli-Proxy-API-Management-Center/plugins/clickhouse-sink/deriver/extract"
@@ -139,10 +140,15 @@ func (d *deriver) watermark(ctx context.Context) (string, error) {
 	return got.Lower, nil
 }
 
+// fetch returns the next batch of raw rows without facts. It picks the batch
+// from the key columns first and reads bodies only for those rows: sorting the
+// whole table with its bodies attached runs ClickHouse out of memory on a rebuild.
 func (d *deriver) fetch(ctx context.Context, lower, cursorTS, cursorID string) ([]extract.Row, error) {
-	q := `SELECT request_id, trace_id, started_at, ingested_at,
-    duration_ms, path, source_format, model, stream, outcome, status_code, error,
-    request_headers, request_body, response_body, response_chunks, redaction_count
+	type key struct {
+		RequestID string `json:"request_id"`
+		StartedAt string `json:"started_at"`
+	}
+	keysQ := `SELECT request_id, started_at
 FROM ` + d.db + `.requests
 WHERE ingested_at >= {lower:DateTime64(9, 'UTC')}
   AND (ingested_at, request_id) > ({cts:DateTime64(9, 'UTC')}, {cid:String})
@@ -151,9 +157,41 @@ WHERE ingested_at >= {lower:DateTime64(9, 'UTC')}
 ORDER BY ingested_at, request_id
 LIMIT {limit:UInt32}`
 	params := map[string]string{"lower": lower, "cts": cursorTS, "cid": cursorID, "limit": fmt.Sprint(d.batchSize)}
+	var keys []key
+	if err := selectRows(ctx, d.ch, keysQ, params, func(k key) { keys = append(keys, k) }); err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, len(keys))
+	minTS, maxTS := keys[0].StartedAt, keys[0].StartedAt
+	for i, k := range keys {
+		ids[i] = k.RequestID
+		minTS, maxTS = min(minTS, k.StartedAt), max(maxTS, k.StartedAt)
+	}
+	rowsQ := `SELECT request_id, trace_id, started_at, ingested_at,
+    duration_ms, path, source_format, model, stream, outcome, status_code, error,
+    request_headers, request_body, response_body, response_chunks, redaction_count
+FROM ` + d.db + `.requests
+WHERE started_at BETWEEN {smin:DateTime64(9, 'UTC')} AND {smax:DateTime64(9, 'UTC')}
+  AND request_id IN {ids:Array(String)}
+  AND ingested_at >= {lower:DateTime64(9, 'UTC')}
+  AND (ingested_at, request_id) > ({cts:DateTime64(9, 'UTC')}, {cid:String})
+ORDER BY ingested_at, request_id`
+	params["smin"], params["smax"], params["ids"] = minTS, maxTS, stringArray(ids)
 	var rows []extract.Row
-	err := selectRows(ctx, d.ch, q, params, func(r extract.Row) { rows = append(rows, r) })
+	err := selectRows(ctx, d.ch, rowsQ, params, func(r extract.Row) { rows = append(rows, r) })
 	return rows, err
+}
+
+// stringArray formats a ClickHouse Array(String) query parameter.
+func stringArray(vs []string) string {
+	quoted := make([]string, len(vs))
+	for i, v := range vs {
+		quoted[i] = "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(v) + "'"
+	}
+	return "[" + strings.Join(quoted, ",") + "]"
 }
 
 func (d *deriver) knownConversations(ctx context.Context, ids []string) (map[string]bool, error) {
