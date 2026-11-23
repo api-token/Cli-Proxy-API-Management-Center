@@ -309,6 +309,13 @@ func TestChatNonStreamAndKinds(t *testing.T) {
 	} {
 		eq(t, "kind("+path+")", kindOf(path), want)
 	}
+
+	action := "/v1beta/models/*action"
+	eq(t, "kind(stream action)", rowKind(Row{Path: action, Stream: true}), "generate")
+	eq(t, "kind(failed action)", rowKind(Row{Path: action}), "generate")
+	eq(t, "kind(generate action)", rowKind(Row{Path: action, ResponseBody: `{"candidates":[]}`}), "generate")
+	eq(t, "kind(countTokens action)", rowKind(Row{Path: action, ResponseBody: `{"totalTokens":12}`}), "count_tokens")
+	eq(t, "kind(plain path)", rowKind(Row{Path: "/v1/models"}), "models")
 }
 
 func TestSanitize(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 
 // Version is stored in request_facts.extractor_version. Bump it whenever the
 // output for the same raw row changes, then run a rebuild.
-const Version uint16 = 2
+const Version uint16 = 3
 
 // Parse statuses stored in request_facts.parse_status.
 const (
@@ -186,7 +186,7 @@ func base(row Row) Facts {
 		DurationMs:       row.DurationMs,
 		Error:            row.Error,
 		Path:             row.Path,
-		Kind:             kindOf(row.Path),
+		Kind:             rowKind(row),
 		Client:           clientOf(row.RequestHeaders),
 		ToolsOffered:     []string{},
 		ToolsCalled:      []string{},
@@ -487,6 +487,19 @@ func kindOf(path string) string {
 		return p[i+1:]
 	}
 	return p
+}
+
+// rowKind is kindOf, except for CPA's Gemini route, which records the route
+// template "/v1beta/models/*action" instead of the real path. A countTokens
+// call is recognized by its reply; every other call there is generate.
+func rowKind(row Row) string {
+	if !strings.HasSuffix(row.Path, "/*action") {
+		return kindOf(row.Path)
+	}
+	if !row.Stream && gjson.Get(row.ResponseBody, "totalTokens").Exists() && !gjson.Get(row.ResponseBody, "candidates").Exists() {
+		return "count_tokens"
+	}
+	return "generate"
 }
 
 // clientOf names the calling client from its headers, `unknown` when nothing matches.
