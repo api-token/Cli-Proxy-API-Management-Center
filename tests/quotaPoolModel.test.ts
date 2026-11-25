@@ -12,7 +12,7 @@ import {
   type PoolMember,
 } from '@/features/quota/poolModel';
 import { normalizeQuotaHistorySample } from '@/services/api/quotaHistory';
-import { buildPoolMembers, groupSamples } from '@/features/quota/poolMembers';
+import { buildPoolMembers, groupSamples, poolNow } from '@/features/quota/poolMembers';
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 4, 12);
@@ -305,5 +305,45 @@ describe('buildPoolMembers history matching', () => {
       (item) => item.file.name
     );
     expect(members).toHaveLength(0);
+  });
+});
+
+describe('poolNow', () => {
+  test('a refresh shows in the pool before the minute clock ticks', () => {
+    const entry = { file: { name: 'claude-a.json', type: 'claude' }, type: 'claude' as const };
+    const reading = (observedAtMs: number, remainingPercent: number) => ({
+      key: 'claude-a.json',
+      name: 'claude-a.json',
+      authIndex: null,
+      provider: 'claude' as const,
+      observedAtMs,
+      windowId: null,
+      periodHours: 168,
+      remainingPercent,
+      resetAtMs: null,
+    });
+    const earlier = reading(NOW - HOUR, 60);
+    // Stamped with Date.now() 30s after the clock's last tick.
+    const refreshed = reading(NOW + 30_000, 40);
+    const liveByKey = new Map([['claude-a.json', refreshed]]);
+    const samples = groupSamples(
+      [earlier, refreshed].map(({ key: _key, ...rest }) => ({ ...rest, source: 'management' }))
+    );
+    const members = buildPoolMembers([entry], 'claude', samples, liveByKey, () => 'a');
+    const options = {
+      spanStartMs: NOW - 24 * HOUR,
+      spanEndMs: NOW + 24 * HOUR,
+      burnWindowHours: 3 as const,
+      futureUsage: 'same' as const,
+    };
+
+    expect(buildPool(members, { ...options, now: NOW }).remaining).toBe(60);
+    const now = poolNow(NOW, liveByKey);
+    expect(now).toBe(NOW + 30_000);
+    expect(buildPool(members, { ...options, now }).remaining).toBe(40);
+  });
+
+  test('keeps the clock when no reading is newer', () => {
+    expect(poolNow(NOW, new Map())).toBe(NOW);
   });
 });
