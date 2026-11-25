@@ -54,7 +54,7 @@ import {
 import { accountSortValue, hasShortWindow } from './accountSummary';
 import { nextRecoveryMs } from './resetSchedule';
 import { buildPool, poolSpan, type BurnWindowHours, type FutureUsageMode } from './poolModel';
-import { buildPoolMembers } from './poolMembers';
+import { buildPoolMembers, poolNow } from './poolMembers';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useQuotaActions } from './hooks/useQuotaActions';
@@ -402,6 +402,8 @@ export function QuotaPage() {
     [showEmails]
   );
 
+  const chartNow = useMemo(() => poolNow(now, history.liveByKey), [history.liveByKey, now]);
+
   const pools = useMemo(() => {
     const providers = tab === 'all' ? QUOTA_TAB_ORDER : [tab];
     return providers.flatMap((provider) => {
@@ -414,7 +416,7 @@ export function QuotaPage() {
       );
       if (members.length === 0) return [];
       const summary = buildPool(members, {
-        now,
+        now: chartNow,
         spanStartMs: span.startMs,
         spanEndMs: span.endMs,
         burnWindowHours,
@@ -422,7 +424,7 @@ export function QuotaPage() {
       });
       return [{ provider, accountCount: members.length, summary }];
     });
-  }, [burnWindowHours, futureUsage, history, labelFor, now, poolEntries, span, tab]);
+  }, [burnWindowHours, chartNow, futureUsage, history, labelFor, poolEntries, span, tab]);
 
   const updateUi =
     <K extends keyof QuotaUiState>(key: K, setter: (value: NonNullable<QuotaUiState[K]>) => void) =>
@@ -516,7 +518,7 @@ export function QuotaPage() {
                   summary={pool.summary}
                   viewMode={viewMode}
                   span={span}
-                  now={now}
+                  now={chartNow}
                   burnWindowHours={burnWindowHours}
                   resolvedTheme={resolvedTheme}
                 />

@@ -70,6 +70,20 @@ export function readingFor(
   };
 }
 
+/**
+ * The instant pools are built at. Fresh readings are stamped with Date.now(),
+ * which runs up to a minute ahead of the shared minute clock, and a pool
+ * ignores readings after its `now`; without this a refresh would only show up
+ * on the next clock tick.
+ */
+export function poolNow(clockNow: number, liveByKey: ReadonlyMap<string, PoolReading>): number {
+  let latest = clockNow;
+  liveByKey.forEach((reading) => {
+    latest = Math.max(latest, reading.observedAtMs);
+  });
+  return latest;
+}
+
 /** Same window if both lengths are known and within 10% of each other. */
 const samePeriod = (a: number | null, b: number | null) =>
   a === null || b === null || Math.abs(a - b) <= Math.max(a, b) * 0.1;
